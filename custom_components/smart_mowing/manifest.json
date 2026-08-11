@@ -1,7 +1,9 @@
 {
   "domain": "smart_mowing",
   "name": "Smart Mowing",
-  "codeowners": ["@jumlu"],
+  "codeowners": [
+    "@jumlu"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/jumlu/ha-smart-mowing",
@@ -9,5 +11,5 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/jumlu/ha-smart-mowing/issues",
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
