@@ -26,8 +26,11 @@ CONF_IRRIGATION_ENTITIES = "irrigation_entities"
 CONF_IRRIGATION_LOCKOUT_HOURS = "irrigation_lockout_hours"
 
 # --- Options keys ---
-CONF_GDD_BASE_TEMP = "gdd_base_temp"
-CONF_GDD_THRESHOLD = "gdd_threshold"
+CONF_GROWTH_OPTIMAL_TEMP = "growth_optimal_temp"
+CONF_GROWTH_TEMP_VARIANCE = "growth_temp_variance"
+CONF_GROWTH_MAX_RATE_MM = "growth_max_rate_mm"
+CONF_GROWTH_THRESHOLD_MM = "growth_threshold_mm"
+CONF_SOLAR_RADIATION_REFERENCE = "solar_radiation_reference"
 CONF_MOW_WINDOW_START = "mow_window_start"
 CONF_MOW_WINDOW_END = "mow_window_end"
 CONF_ALLOWED_WEEKDAYS = "allowed_weekdays"
@@ -46,8 +49,16 @@ CONF_RELEASE_GRACE_MINUTES = "release_grace_minutes"
 CONF_ONLY_DOCK_OWN_RUNS = "only_dock_own_runs"
 
 # --- Defaults ---
-DEFAULT_GDD_BASE_TEMP = 5.0
-DEFAULT_GDD_THRESHOLD = 50.0
+# Growth Potential (PACE Turf) defaults for cool-season (C3) turf: Lolium, Poa,
+# Festuca - the common lawn grasses in Central Europe. Growth peaks at
+# growth_optimal_temp and falls off on both sides with a Gaussian of width
+# growth_temp_variance, so heat above the optimum reduces growth on its own
+# instead of needing a separate correction.
+DEFAULT_GROWTH_OPTIMAL_TEMP = 20.0
+DEFAULT_GROWTH_TEMP_VARIANCE = 5.5
+DEFAULT_GROWTH_MAX_RATE_MM = 4.0
+DEFAULT_GROWTH_THRESHOLD_MM = 4.0
+DEFAULT_SOLAR_RADIATION_REFERENCE = 800.0
 DEFAULT_MOW_WINDOW_START = time(10, 0)
 DEFAULT_MOW_WINDOW_END = time(18, 0)
 DEFAULT_ALLOWED_WEEKDAYS = ["0", "1", "2", "3", "4", "5", "6"]  # Mon..Sun
@@ -68,6 +79,10 @@ DEFAULT_ONLY_DOCK_OWN_RUNS = True
 
 # --- Growth model damping when no rain sensor is configured ---
 NO_SOIL_SENSOR_DROUGHT_FACTOR = 0.3
+
+# --- Growth model: floor applied to the light factor so overcast days damp
+# growth rather than stopping it outright (diffuse light still photosynthesizes) ---
+LIGHT_FACTOR_MIN = 0.3
 
 # --- Timing intervals ---
 EVALUATION_INTERVAL_MINUTES = 5

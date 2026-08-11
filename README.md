@@ -39,37 +39,57 @@ The setup dialog has three steps, one config entry per lawn area:
    irrigation ends.
    <!-- screenshot: config-flow-step-3.png -->
 
-All thresholds (GDD base temperature, GDD threshold, mow window, weekdays, minimum interval,
-heat/drought/rain thresholds, hysteresis offsets, ...) can be changed afterwards without deleting
-the entry, via the entry's **Configure** (options flow) dialog.
+All thresholds (growth-model parameters, mow window, weekdays, minimum interval, heat/drought/rain
+thresholds, hysteresis offsets, ...) can be changed afterwards without deleting the entry, via the
+entry's **Configure** (options flow) dialog.
 
 The integration runs with just a mower and a temperature sensor — every optional sensor makes the
 decision more precise, but nothing is required beyond that minimal setup.
 
-## The growth model (Growing Degree Days)
+## The growth model (Growth Potential)
 
-Grass growth roughly tracks accumulated warmth above a base temperature at which growth starts
-(cool-season grasses: ~5 °C). Each day, the integration computes
-`gdd = max(0, daily_average_temperature - base_temperature)` from a running average of the
-configured temperature sensor, and adds it to a `growth_index` accumulator at midnight. Once
-the accumulator reaches the configured threshold (default 50 GDD), the lawn is considered ready to
-mow. The accumulator resets to 0 only after a *successful* mow — a mow aborted by rain leaves the
-accumulated progress untouched, since the grass didn't stop growing just because the mower got
-interrupted.
+Grass growth is modeled with [PACE Turf's Growth Potential](https://www.paceturf.org/PTRI/Documents/0004.pdf),
+the standard turf-management model for translating weather into growth — rather than Growing
+Degree Days (GDD). GDD rises monotonically with temperature, so it peaks at exactly the point
+(high heat) where cool-season grasses (Lolium, Poa, Festuca — the common lawn types in Central
+Europe) actually stop growing; correcting for that would need a bolted-on bypass. Growth Potential
+instead models growth as a bell curve centered on an optimal temperature:
 
-If a soil-moisture sensor is configured, the daily GDD contribution is scaled down proportionally
-to how dry the soil is (`soil_moisture / drought_threshold`, clamped to `[0, 1]`) — grass grows
-slower when water is limited, whether or not there's a hard drought lockout in effect. Without a
-soil sensor but with a rain-amount sensor, growth is dampened by a fixed factor after a configured
-number of rain-free days. This means the "don't mow during a hot, dry spell" behaviour falls out
-of the growth model itself — no rain, no growth, no need — on top of the explicit heat/drought
-lockouts below.
+```
+GP = exp(-0.5 × ((avg_temp − optimal_temp) / temp_variance)²)   # 0..1
+```
+
+Each day, the integration computes the average of the configured temperature sensor, derives `GP`,
+and turns it into a millimeter growth amount:
+
+```
+growth_mm = GP × max_growth_rate × water_factor × light_factor
+```
+
+- **`max_growth_rate`** (default 4 mm/day) is the growth rate at perfect conditions — the one
+  number to tune if your lawn grows faster or slower than the default assumes.
+- **`water_factor`** damps growth when water is limited: `soil_moisture / drought_threshold`
+  (clamped to `[0, 1]`) if a soil-moisture sensor is configured, otherwise a fixed damping factor
+  once a configured number of rain-free days has passed.
+- **`light_factor`** damps growth on overcast days if a solar-radiation sensor is configured:
+  `solar_radiation / reference`, clamped to `[0.3, 1]` — diffuse light still allows some growth,
+  so it floors rather than zeroes out.
+
+The result accumulates into `growth_index` (mm) at midnight. Once it reaches the configured
+threshold (default 4 mm — the classic one-third rule is too coarse for a mulching mower that
+should take small amounts often), the lawn is considered ready to mow. The accumulator resets to 0
+only after a *successful* mow — a mow aborted by rain leaves the accumulated progress untouched,
+since the grass didn't stop growing just because the mower got interrupted.
+
+Because the temperature response is a bell curve, growth collapses on its own during a hot spell —
+no separate correction needed. The heat lockout below still exists, but purely to protect the
+mower hardware from operating in extreme heat, independent of the growth model.
 
 ## Entities
 
 | Entity | Type | Description |
 |---|---|---|
-| `sensor.<name>_growth_index` | Sensor (`total`, restores across restarts) | Accumulated GDD since the last successful mow |
+| `sensor.<name>_growth_index` | Sensor (`total`, restores across restarts) | Accumulated growth in mm since the last successful mow |
 | `sensor.<name>_mow_need` | Sensor (%) | `growth_index / threshold × 100`, capped at 200% |
 | `binary_sensor.<name>_mowing_allowed` | Binary sensor | AND of all lockouts; `blockers` attribute lists active reasons |
 | `binary_sensor.<name>_grass_wet` | Binary sensor (`moisture`) | Standalone wetness assessment (rain/dew/recent rain) |

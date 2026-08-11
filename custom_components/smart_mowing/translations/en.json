@@ -41,8 +41,11 @@
       "init": {
         "title": "Smart Mowing thresholds",
         "data": {
-          "gdd_base_temp": "GDD base temperature",
-          "gdd_threshold": "GDD threshold for mow need",
+          "growth_optimal_temp": "Optimal growth temperature",
+          "growth_temp_variance": "Temperature tolerance (± around optimum)",
+          "growth_max_rate_mm": "Maximum growth rate at ideal conditions",
+          "growth_threshold_mm": "Growth threshold to trigger a mow",
+          "solar_radiation_reference": "Solar radiation for full growth (reference)",
           "mow_window_start": "Mow window start",
           "mow_window_end": "Mow window end",
           "allowed_weekdays": "Allowed weekdays",
@@ -117,7 +120,7 @@
       "description": "Calibrate the growth index to a specific value.",
       "fields": {
         "entity_id": { "name": "Entity", "description": "Any Smart Mowing entity of the target lawn area." },
-        "value": { "name": "Value", "description": "New growth index value (GDD)." }
+        "value": { "name": "Value", "description": "New growth index value (mm)." }
       }
     }
   }

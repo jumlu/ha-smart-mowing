@@ -20,8 +20,10 @@ from .const import (
     CONF_DEWPOINT_SPREAD_MIN,
     CONF_DROUGHT_NO_RAIN_DAYS,
     CONF_DROUGHT_SOIL_MOISTURE_THRESHOLD,
-    CONF_GDD_BASE_TEMP,
-    CONF_GDD_THRESHOLD,
+    CONF_GROWTH_MAX_RATE_MM,
+    CONF_GROWTH_OPTIMAL_TEMP,
+    CONF_GROWTH_TEMP_VARIANCE,
+    CONF_GROWTH_THRESHOLD_MM,
     CONF_HEAT_LOCKOUT_TEMP,
     CONF_HUMIDITY_ENTITY,
     CONF_HYSTERESIS_DEWPOINT,
@@ -43,13 +45,16 @@ from .const import (
     CONF_RELEASE_GRACE_MINUTES,
     CONF_SOIL_MOISTURE_ENTITY,
     CONF_SOLAR_RADIATION_ENTITY,
+    CONF_SOLAR_RADIATION_REFERENCE,
     CONF_TEMPERATURE_ENTITY,
     DEFAULT_ALLOWED_WEEKDAYS,
     DEFAULT_DEWPOINT_SPREAD_MIN,
     DEFAULT_DROUGHT_NO_RAIN_DAYS,
     DEFAULT_DROUGHT_SOIL_MOISTURE_THRESHOLD,
-    DEFAULT_GDD_BASE_TEMP,
-    DEFAULT_GDD_THRESHOLD,
+    DEFAULT_GROWTH_MAX_RATE_MM,
+    DEFAULT_GROWTH_OPTIMAL_TEMP,
+    DEFAULT_GROWTH_TEMP_VARIANCE,
+    DEFAULT_GROWTH_THRESHOLD_MM,
     DEFAULT_HEAT_LOCKOUT_TEMP,
     DEFAULT_HYSTERESIS_DEWPOINT,
     DEFAULT_HYSTERESIS_SOIL_MOISTURE,
@@ -63,6 +68,7 @@ from .const import (
     DEFAULT_RECENT_RAIN_HOURS,
     DEFAULT_RECENT_RAIN_THRESHOLD,
     DEFAULT_RELEASE_GRACE_MINUTES,
+    DEFAULT_SOLAR_RADIATION_REFERENCE,
     DOMAIN,
 )
 
@@ -212,17 +218,43 @@ class SmartMowingOptionsFlow(OptionsFlow):
         schema = vol.Schema(
             {
                 vol.Optional(
-                    CONF_GDD_BASE_TEMP,
-                    default=options.get(CONF_GDD_BASE_TEMP, DEFAULT_GDD_BASE_TEMP),
+                    CONF_GROWTH_OPTIMAL_TEMP,
+                    default=options.get(CONF_GROWTH_OPTIMAL_TEMP, DEFAULT_GROWTH_OPTIMAL_TEMP),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=40, step=0.5, unit_of_measurement="°C")
+                ),
+                vol.Optional(
+                    CONF_GROWTH_TEMP_VARIANCE,
+                    default=options.get(CONF_GROWTH_TEMP_VARIANCE, DEFAULT_GROWTH_TEMP_VARIANCE),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=1, max=15, step=0.5, unit_of_measurement="K")
+                ),
+                vol.Optional(
+                    CONF_GROWTH_MAX_RATE_MM,
+                    default=options.get(CONF_GROWTH_MAX_RATE_MM, DEFAULT_GROWTH_MAX_RATE_MM),
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(
-                        min=-10, max=20, step=0.5, unit_of_measurement="°C"
+                        min=0.5, max=15, step=0.5, unit_of_measurement="mm/d"
                     )
                 ),
                 vol.Optional(
-                    CONF_GDD_THRESHOLD,
-                    default=options.get(CONF_GDD_THRESHOLD, DEFAULT_GDD_THRESHOLD),
-                ): selector.NumberSelector(selector.NumberSelectorConfig(min=1, max=500, step=1)),
+                    CONF_GROWTH_THRESHOLD_MM,
+                    default=options.get(CONF_GROWTH_THRESHOLD_MM, DEFAULT_GROWTH_THRESHOLD_MM),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0.5, max=30, step=0.5, unit_of_measurement="mm"
+                    )
+                ),
+                vol.Optional(
+                    CONF_SOLAR_RADIATION_REFERENCE,
+                    default=options.get(
+                        CONF_SOLAR_RADIATION_REFERENCE, DEFAULT_SOLAR_RADIATION_REFERENCE
+                    ),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=100, max=1200, step=50, unit_of_measurement="W/m²"
+                    )
+                ),
                 vol.Optional(
                     CONF_MOW_WINDOW_START,
                     default=options.get(

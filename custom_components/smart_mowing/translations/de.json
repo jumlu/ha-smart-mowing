@@ -41,8 +41,11 @@
       "init": {
         "title": "Smart Mowing Schwellwerte",
         "data": {
-          "gdd_base_temp": "GDD-Basistemperatur",
-          "gdd_threshold": "GDD-Schwelle für Mähbedarf",
+          "growth_optimal_temp": "Optimale Wachstumstemperatur",
+          "growth_temp_variance": "Temperaturtoleranz (± um das Optimum)",
+          "growth_max_rate_mm": "Maximaler Zuwachs bei Idealbedingungen",
+          "growth_threshold_mm": "Wachstums-Schwelle für Mähbedarf",
+          "solar_radiation_reference": "Solarstrahlung für volles Wachstum (Referenz)",
           "mow_window_start": "Mähfenster Start",
           "mow_window_end": "Mähfenster Ende",
           "allowed_weekdays": "Erlaubte Wochentage",
@@ -117,7 +120,7 @@
       "description": "Kalibriert den Wachstumsindex auf einen bestimmten Wert.",
       "fields": {
         "entity_id": { "name": "Entity", "description": "Eine beliebige Smart-Mowing-Entity der Ziel-Rasenfläche." },
-        "value": { "name": "Wert", "description": "Neuer Wachstumsindex-Wert (GDD)." }
+        "value": { "name": "Wert", "description": "Neuer Wachstumsindex-Wert (mm)." }
       }
     }
   }

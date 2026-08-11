@@ -51,11 +51,11 @@ class _BaseSensor(SensorEntity):
 
 
 class GrowthIndexSensor(_BaseSensor, RestoreEntity):
-    """Accumulated Growing Degree Days since the last mow."""
+    """Accumulated lawn growth, in mm, since the last mow."""
 
     _attr_translation_key = "growth_index"
     _attr_state_class = SensorStateClass.TOTAL
-    _attr_native_unit_of_measurement = "GDD"
+    _attr_native_unit_of_measurement = "mm"
     _attr_icon = "mdi:sprout"
 
     def __init__(self, coordinator: SmartMowingCoordinator, entry: ConfigEntry) -> None:

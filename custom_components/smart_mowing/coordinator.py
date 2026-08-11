@@ -3,12 +3,13 @@
 No DataUpdateCoordinator / polling is used. Re-evaluation is driven by
 state-change events on the configured source entities plus a periodic
 timer (temperature sampling, blocker re-evaluation) and a daily rollover
-timer (GDD accumulation).
+timer (growth accumulation).
 """
 
 from __future__ import annotations
 
 import logging
+import math
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
@@ -43,8 +44,10 @@ from .const import (
     CONF_DEWPOINT_SPREAD_MIN,
     CONF_DROUGHT_NO_RAIN_DAYS,
     CONF_DROUGHT_SOIL_MOISTURE_THRESHOLD,
-    CONF_GDD_BASE_TEMP,
-    CONF_GDD_THRESHOLD,
+    CONF_GROWTH_MAX_RATE_MM,
+    CONF_GROWTH_OPTIMAL_TEMP,
+    CONF_GROWTH_TEMP_VARIANCE,
+    CONF_GROWTH_THRESHOLD_MM,
     CONF_HEAT_LOCKOUT_TEMP,
     CONF_HUMIDITY_ENTITY,
     CONF_HYSTERESIS_DEWPOINT,
@@ -66,13 +69,16 @@ from .const import (
     CONF_RELEASE_GRACE_MINUTES,
     CONF_SOIL_MOISTURE_ENTITY,
     CONF_SOLAR_RADIATION_ENTITY,
+    CONF_SOLAR_RADIATION_REFERENCE,
     CONF_TEMPERATURE_ENTITY,
     DEFAULT_ALLOWED_WEEKDAYS,
     DEFAULT_DEWPOINT_SPREAD_MIN,
     DEFAULT_DROUGHT_NO_RAIN_DAYS,
     DEFAULT_DROUGHT_SOIL_MOISTURE_THRESHOLD,
-    DEFAULT_GDD_BASE_TEMP,
-    DEFAULT_GDD_THRESHOLD,
+    DEFAULT_GROWTH_MAX_RATE_MM,
+    DEFAULT_GROWTH_OPTIMAL_TEMP,
+    DEFAULT_GROWTH_TEMP_VARIANCE,
+    DEFAULT_GROWTH_THRESHOLD_MM,
     DEFAULT_HEAT_LOCKOUT_TEMP,
     DEFAULT_HYSTERESIS_DEWPOINT,
     DEFAULT_HYSTERESIS_SOIL_MOISTURE,
@@ -86,11 +92,13 @@ from .const import (
     DEFAULT_RECENT_RAIN_HOURS,
     DEFAULT_RECENT_RAIN_THRESHOLD,
     DEFAULT_RELEASE_GRACE_MINUTES,
+    DEFAULT_SOLAR_RADIATION_REFERENCE,
     DOMAIN,
     EVALUATION_INTERVAL_MINUTES,
     EVENT_MOWING_ABORTED,
     EVENT_MOWING_COMPLETED,
     EVENT_MOWING_STARTED,
+    LIGHT_FACTOR_MIN,
     NEED_PERCENT_CAP,
     NO_SOIL_SENSOR_DROUGHT_FACTOR,
     STATE_DOCKED,
@@ -117,19 +125,45 @@ def clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
-def compute_daily_gdd(average_temp: float, base_temp: float) -> float:
-    """Growing Degree Days for one day."""
-    return max(0.0, average_temp - base_temp)
+def compute_growth_potential(
+    average_temp: float, optimal_temp: float, temp_variance: float
+) -> float:
+    """PACE Turf Growth Potential: a 0..1 Gaussian response to temperature.
+
+    Unlike a monotonic degree-day sum, this falls off on *both* sides of
+    optimal_temp - heat above the optimum reduces growth on its own, without
+    a separate correction.
+    """
+    if temp_variance <= 0:
+        return 0.0
+    return math.exp(-0.5 * ((average_temp - optimal_temp) / temp_variance) ** 2)
 
 
-def compute_growth_factor(
+def compute_daily_growth_mm(
+    average_temp: float,
+    optimal_temp: float,
+    temp_variance: float,
+    max_growth_mm: float,
+    water_factor: float,
+    light_factor: float,
+) -> float:
+    """Daily lawn growth in mm: Growth Potential x max rate x water x light."""
+    return (
+        compute_growth_potential(average_temp, optimal_temp, temp_variance)
+        * max_growth_mm
+        * water_factor
+        * light_factor
+    )
+
+
+def compute_water_factor(
     soil_moisture: float | None,
     drought_soil_threshold: float,
     rain_amount_configured: bool,
     days_since_rain: float | None,
     drought_no_rain_days: int,
 ) -> float:
-    """Damping factor applied to daily GDD when water is limited."""
+    """Damping factor applied to daily growth when water is limited."""
     factor = 1.0
     if soil_moisture is not None:
         factor *= clamp(soil_moisture / drought_soil_threshold, 0.0, 1.0)
@@ -140,6 +174,17 @@ def compute_growth_factor(
     ):
         factor *= NO_SOIL_SENSOR_DROUGHT_FACTOR
     return factor
+
+
+def compute_light_factor(solar_radiation: float | None, reference: float) -> float:
+    """Damping factor applied to daily growth when light is limited.
+
+    Returns 1.0 (no damping) when no solar sensor is configured - light
+    limitation is opt-in, like the other optional weather factors.
+    """
+    if solar_radiation is None or reference <= 0:
+        return 1.0
+    return clamp(solar_radiation / reference, LIGHT_FACTOR_MIN, 1.0)
 
 
 def below_with_hysteresis(
@@ -264,12 +309,24 @@ class SmartMowingCoordinator:
         return self.entry.data.get(CONF_IRRIGATION_ENTITIES, []) or []
 
     @property
-    def gdd_base_temp(self) -> float:
-        return float(self._cfg(CONF_GDD_BASE_TEMP, DEFAULT_GDD_BASE_TEMP))
+    def growth_optimal_temp(self) -> float:
+        return float(self._cfg(CONF_GROWTH_OPTIMAL_TEMP, DEFAULT_GROWTH_OPTIMAL_TEMP))
 
     @property
-    def gdd_threshold(self) -> float:
-        return float(self._cfg(CONF_GDD_THRESHOLD, DEFAULT_GDD_THRESHOLD))
+    def growth_temp_variance(self) -> float:
+        return float(self._cfg(CONF_GROWTH_TEMP_VARIANCE, DEFAULT_GROWTH_TEMP_VARIANCE))
+
+    @property
+    def growth_max_rate_mm(self) -> float:
+        return float(self._cfg(CONF_GROWTH_MAX_RATE_MM, DEFAULT_GROWTH_MAX_RATE_MM))
+
+    @property
+    def growth_threshold_mm(self) -> float:
+        return float(self._cfg(CONF_GROWTH_THRESHOLD_MM, DEFAULT_GROWTH_THRESHOLD_MM))
+
+    @property
+    def solar_radiation_reference(self) -> float:
+        return float(self._cfg(CONF_SOLAR_RADIATION_REFERENCE, DEFAULT_SOLAR_RADIATION_REFERENCE))
 
     @property
     def mow_window_start(self) -> time:
@@ -464,30 +521,46 @@ class SmartMowingCoordinator:
         delta = dt_util.utcnow() - self.state.last_rain_time
         return delta.total_seconds() / 86400.0
 
-    def _roll_over_day(self) -> None:
-        if self.state.daily_temp_count == 0:
-            self.state.last_rollover_date = dt_util.now().date()
-            return
-        average_temp = self.state.daily_temp_sum / self.state.daily_temp_count
-        daily_gdd = compute_daily_gdd(average_temp, self.gdd_base_temp)
+    def _current_water_factor(self) -> float:
         soil_moisture = _float_state(self.hass, self.soil_moisture_entity_id)
-        factor = compute_growth_factor(
+        return compute_water_factor(
             soil_moisture,
             self.drought_soil_moisture_threshold,
             self.rain_amount_entity_id is not None,
             self._days_since_rain(),
             self.drought_no_rain_days,
         )
-        self.state.growth_index += daily_gdd * factor
+
+    def _current_light_factor(self) -> float:
+        solar_radiation = _float_state(self.hass, self.solar_radiation_entity_id)
+        return compute_light_factor(solar_radiation, self.solar_radiation_reference)
+
+    def _roll_over_day(self) -> None:
+        if self.state.daily_temp_count == 0:
+            self.state.last_rollover_date = dt_util.now().date()
+            return
+        average_temp = self.state.daily_temp_sum / self.state.daily_temp_count
+        water_factor = self._current_water_factor()
+        light_factor = self._current_light_factor()
+        daily_growth = compute_daily_growth_mm(
+            average_temp,
+            self.growth_optimal_temp,
+            self.growth_temp_variance,
+            self.growth_max_rate_mm,
+            water_factor,
+            light_factor,
+        )
+        self.state.growth_index += daily_growth
         self.state.daily_temp_sum = 0.0
         self.state.daily_temp_count = 0
         self.state.last_rollover_date = dt_util.now().date()
         _LOGGER.debug(
-            "%s: daily rollover avg_temp=%.2f gdd=%.2f factor=%.2f growth_index=%.2f",
+            "%s: daily rollover avg_temp=%.2f growth_mm=%.2f water=%.2f light=%.2f growth_index=%.2f",
             self.device_name,
             average_temp,
-            daily_gdd,
-            factor,
+            daily_growth,
+            water_factor,
+            light_factor,
             self.state.growth_index,
         )
 
@@ -637,10 +710,12 @@ class SmartMowingCoordinator:
             or BLOCKER_RECENT_RAIN in raw_blockers
         )
         self.state.mow_allowed = not blockers
-        self.state.mow_needed = self.state.growth_index >= self.gdd_threshold
+        self.state.mow_needed = self.state.growth_index >= self.growth_threshold_mm
         self.state.need_percent = min(
             NEED_PERCENT_CAP,
-            (self.state.growth_index / self.gdd_threshold * 100.0) if self.gdd_threshold else 0.0,
+            (self.state.growth_index / self.growth_threshold_mm * 100.0)
+            if self.growth_threshold_mm
+            else 0.0,
         )
         self._compute_next_mow_estimate()
 
@@ -656,12 +731,19 @@ class SmartMowingCoordinator:
             # need is met, waiting on a blocker to clear - unknown ETA
             self.state.next_mow_time = None
             return
-        remaining = self.gdd_threshold - self.state.growth_index
+        remaining = self.growth_threshold_mm - self.state.growth_index
         if remaining <= 0 or self.state.daily_temp_count == 0:
             self.state.next_mow_time = None
             return
         avg_temp_so_far = self.state.daily_temp_sum / self.state.daily_temp_count
-        daily_rate = compute_daily_gdd(avg_temp_so_far, self.gdd_base_temp)
+        daily_rate = compute_daily_growth_mm(
+            avg_temp_so_far,
+            self.growth_optimal_temp,
+            self.growth_temp_variance,
+            self.growth_max_rate_mm,
+            self._current_water_factor(),
+            self._current_light_factor(),
+        )
         if daily_rate <= 0:
             self.state.next_mow_time = None
             return
