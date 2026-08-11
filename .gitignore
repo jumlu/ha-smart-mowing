@@ -13,3 +13,8 @@ venv/
 *.log
 config/.storage/
 config/*.log
+
+# Never commit local MCP/connector configs - they can embed secrets
+# (e.g. HA webhook proxy URLs contain a bearer-equivalent ID in the path).
+.mcp.json
+.claude/settings.local.json
