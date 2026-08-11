@@ -3,87 +3,102 @@
 Not part of the integration itself - output goes to home-assistant/brands,
 not into custom_components/. Kept here only so the icon can be regenerated
 or tweaked later.
+
+Design: a classic push-mower side silhouette (two wheels, a rounded deck,
+a diagonal handle) - the least ambiguous "lawn mower" pictogram there is -
+as a bold white cutout on a solid squircle. Two earlier top-down/abstract
+concepts (leaf-sprout, D-shaped robot-vacuum glyph, circle-with-grass-
+spikes) all read as something else at a glance (a bowtie, a shield, a cat
+face); a literal mower silhouette doesn't have that problem.
 """
 
 from __future__ import annotations
 
-import math
-
 from PIL import Image, ImageDraw
 
-MOWER_GREEN = (46, 125, 50, 255)  # #2E7D32
-MOWER_GREEN_DARK = (27, 94, 32, 255)  # #1B5E20
-SPROUT_GREEN = (139, 195, 74, 255)  # #8BC34A
+GREEN = (56, 142, 60, 255)  # #388E3C
 WHITE = (255, 255, 255, 255)
+TRANSPARENT = (0, 0, 0, 0)
+
+SS = 4  # supersampling factor for clean anti-aliased edges
 
 
-def _rounded_square_path(size: int, margin: float, radius_ratio: float):
-    inset = size * margin
-    box = (inset, inset, size - inset, size - inset)
-    radius = (box[2] - box[0]) * radius_ratio
-    return box, radius
+def _canvas(size: int) -> tuple[Image.Image, ImageDraw.ImageDraw, int]:
+    s = size * SS
+    img = Image.new("RGBA", (s, s), TRANSPARENT)
+    return img, ImageDraw.Draw(img), s
+
+
+def _down(img: Image.Image, size: int) -> Image.Image:
+    return img.resize((size, size), Image.LANCZOS)
+
+
+def _thick_line(draw: ImageDraw.ImageDraw, p1, p2, width: float, fill) -> None:
+    """A line with round caps, built from a rectangle + two end circles."""
+    x1, y1 = p1
+    x2, y2 = p2
+    dx, dy = x2 - x1, y2 - y1
+    length = (dx**2 + dy**2) ** 0.5
+    nx, ny = -dy / length, dx / length
+    hw = width / 2
+    draw.polygon(
+        [
+            (x1 + nx * hw, y1 + ny * hw),
+            (x2 + nx * hw, y2 + ny * hw),
+            (x2 - nx * hw, y2 - ny * hw),
+            (x1 - nx * hw, y1 - ny * hw),
+        ],
+        fill=fill,
+    )
+    for x, y in (p1, p2):
+        draw.ellipse((x - hw, y - hw, x + hw, y + hw), fill=fill)
 
 
 def draw_icon(size: int) -> Image.Image:
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
+    img, draw, s = _canvas(size)
 
-    # Mower chassis: a large rounded square, flat single-tone per HA brand style.
-    box, radius = _rounded_square_path(size, margin=0.08, radius_ratio=0.34)
-    draw.rounded_rectangle(box, radius=radius, fill=MOWER_GREEN)
+    # Squircle background.
+    margin = s * 0.06
+    radius = (s - 2 * margin) * 0.30
+    draw.rounded_rectangle((margin, margin, s - margin, s - margin), radius=radius, fill=GREEN)
 
-    # Two wheels peeking out at the bottom corners.
-    wheel_r = size * 0.085
-    wheel_y = box[3] - wheel_r * 0.4
-    for wheel_x in (box[0] + size * 0.14, box[2] - size * 0.14):
+    # Deck (mower body/hood): a squat rounded rectangle.
+    deck_left, deck_right = s * 0.22, s * 0.71
+    deck_top, deck_bottom = s * 0.40, s * 0.62
+    deck_radius = s * 0.07
+    draw.rounded_rectangle(
+        (deck_left, deck_top, deck_right, deck_bottom), radius=deck_radius, fill=WHITE
+    )
+
+    # Handle: one bold diagonal bar rooted flush in the deck's top edge,
+    # staying well clear of the squircle's rounded corner.
+    handle_base = (deck_left + (deck_right - deck_left) * 0.62, deck_top)
+    handle_tip = (s * 0.73, s * 0.215)
+    handle_w = s * 0.075
+    _thick_line(draw, handle_base, handle_tip, handle_w, WHITE)
+
+    # Wheels: centered on the deck's bottom edge so their top half tucks
+    # behind the deck - reads as one solid machine, not a cart with legs.
+    wheel_r = s * 0.145
+    wheel_y = deck_bottom
+    for wheel_x in (deck_left + s * 0.10, deck_right - s * 0.10):
         draw.ellipse(
             (wheel_x - wheel_r, wheel_y - wheel_r, wheel_x + wheel_r, wheel_y + wheel_r),
-            fill=MOWER_GREEN_DARK,
+            fill=WHITE,
+        )
+        hub_r = wheel_r * 0.32
+        draw.ellipse(
+            (wheel_x - hub_r, wheel_y - hub_r, wheel_x + hub_r, wheel_y + hub_r), fill=GREEN
         )
 
-    # Lidar/nav puck on top, off-center like the real mower's sensor mast.
-    puck_r = size * 0.065
-    puck_cx, puck_cy = size * 0.5, box[1] + size * 0.09
-    draw.ellipse(
-        (puck_cx - puck_r, puck_cy - puck_r, puck_cx + puck_r, puck_cy + puck_r),
-        fill=MOWER_GREEN_DARK,
-    )
-
-    # Sprout (growth-based decision making) centered in the lower chassis,
-    # well clear of the nav puck above it.
-    cx, cy = size * 0.5, size * 0.64
-    stem_w = size * 0.035
-    stem_top = cy - size * 0.06
-    stem_bottom = cy + size * 0.14
-    draw.line((cx, stem_top, cx, stem_bottom), fill=WHITE, width=int(stem_w))
-    draw.ellipse(
-        (cx - stem_w / 2, stem_bottom - stem_w / 2, cx + stem_w / 2, stem_bottom + stem_w / 2),
-        fill=WHITE,
-    )
-
-    # Two simple pointed-oval leaves, angled up and out from the stem tip.
-    leaf_len, leaf_w = size * 0.24, size * 0.13
-    supersample = 4
-    for direction in (-1, 1):
-        canvas_w, canvas_h = int(leaf_w * supersample), int(leaf_len * supersample)
-        leaf = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
-        leaf_draw = ImageDraw.Draw(leaf)
-        leaf_draw.ellipse((0, 0, canvas_w, canvas_h), fill=SPROUT_GREEN)
-        leaf = leaf.resize((canvas_w // supersample, canvas_h // supersample), Image.LANCZOS)
-        angle = 40 * direction
-        leaf = leaf.rotate(angle, expand=True, resample=Image.BICUBIC)
-        anchor_x = cx + direction * size * 0.11 - leaf.width / 2
-        anchor_y = stem_top - leaf.height * 0.82
-        img.alpha_composite(leaf, (int(anchor_x), int(anchor_y)))
-
-    return img
+    return _down(img, size)
 
 
 def draw_logo(size_w: int, size_h: int) -> Image.Image:
-    """Wordmark-free logo: same icon, slightly more breathing room, wide canvas."""
+    """Same glyph, centered on a wider transparent canvas (no wordmark)."""
     icon_size = min(size_w, size_h)
     icon = draw_icon(icon_size)
-    canvas = Image.new("RGBA", (size_w, size_h), (0, 0, 0, 0))
+    canvas = Image.new("RGBA", (size_w, size_h), TRANSPARENT)
     canvas.alpha_composite(icon, ((size_w - icon_size) // 2, (size_h - icon_size) // 2))
     return canvas
 
