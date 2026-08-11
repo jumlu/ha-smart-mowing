@@ -18,6 +18,11 @@ schedule. It works with any `lawn_mower` entity, regardless of vendor.
 2. Install "Smart Mowing", restart Home Assistant.
 3. Settings → Devices & Services → Add Integration → search "Smart Mowing".
 
+This repository is not (yet) in the default HACS store, so it has to be added as a custom
+repository. It also has no icon in [home-assistant/brands](https://github.com/home-assistant/brands)
+yet — that's a separate PR against that repository and only affects the icon shown in HACS/the UI,
+not functionality.
+
 ## Setup (Config Flow)
 
 The setup dialog has three steps, one config entry per lawn area:
