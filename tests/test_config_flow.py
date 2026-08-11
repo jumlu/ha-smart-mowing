@@ -96,8 +96,10 @@ async def test_reconfigure_updates_existing_entry(hass):
     result = await entry.start_reconfigure_flow(hass)
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "user"
-    # pre-filled with the entry's current data
-    assert result["data_schema"]({})[CONF_MOWER_ENTITY] == MOWER_ENTITY
+    # pre-filled with the entry's current data (as a UI suggested_value, not
+    # a voluptuous default, so it doesn't get re-validated when left blank)
+    mower_key = next(k for k in result["data_schema"].schema if k == CONF_MOWER_ENTITY)
+    assert mower_key.description == {"suggested_value": MOWER_ENTITY}
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
