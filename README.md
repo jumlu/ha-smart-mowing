@@ -19,9 +19,9 @@ regardless of vendor.
 3. Settings → Devices & Services → **+ Add Integration** → search "Smart Mowing".
 
 This repository is not (yet) in the default HACS store, so it has to be added as a custom
-repository. It also has no icon in [home-assistant/brands](https://github.com/home-assistant/brands)
-yet — that's a separate PR against that repository and only affects the icon shown in HACS/the UI,
-not functionality.
+repository. The brand icon/logo ship directly in `custom_components/smart_mowing/brand/` (supported
+since HA 2026.3 — no separate [home-assistant/brands](https://github.com/home-assistant/brands) PR
+needed); source SVGs are kept in `.brand_assets/` for future edits.
 
 Each config entry shows up as a card under Settings → Devices & Services → **Integrations**, with
 the resulting device (e.g. "Smart Mowing Controller") grouping all of its entities underneath.
