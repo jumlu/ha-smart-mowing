@@ -12,10 +12,10 @@ import logging
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
-from typing import Any
+from typing import Any, TypeGuard
 
 from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.event import (
@@ -133,9 +133,12 @@ def compute_growth_factor(
     factor = 1.0
     if soil_moisture is not None:
         factor *= clamp(soil_moisture / drought_soil_threshold, 0.0, 1.0)
-    elif rain_amount_configured and days_since_rain is not None:
-        if days_since_rain >= drought_no_rain_days:
-            factor *= NO_SOIL_SENSOR_DROUGHT_FACTOR
+    elif (
+        rain_amount_configured
+        and days_since_rain is not None
+        and days_since_rain >= drought_no_rain_days
+    ):
+        factor *= NO_SOIL_SENSOR_DROUGHT_FACTOR
     return factor
 
 
@@ -157,7 +160,7 @@ def above_with_hysteresis(
     return value > threshold
 
 
-def _is_valid_state(state) -> bool:
+def _is_valid_state(state: State | None) -> TypeGuard[State]:
     return state is not None and state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE)
 
 
@@ -449,7 +452,7 @@ class SmartMowingCoordinator:
         cutoff = now - timedelta(hours=hours)
         history = [item for item in self.state.rain_history if item[0] >= cutoff]
         total = 0.0
-        for (_, prev), (_, cur) in zip(history, history[1:]):
+        for (_, prev), (_, cur) in zip(history, history[1:], strict=False):
             delta = cur - prev
             if delta > 0:
                 total += delta
@@ -517,7 +520,9 @@ class SmartMowingCoordinator:
         return state.state
 
     def _required_sources_available(self) -> bool:
-        temp = self.hass.states.get(self.temperature_entity_id) if self.temperature_entity_id else None
+        temp = (
+            self.hass.states.get(self.temperature_entity_id) if self.temperature_entity_id else None
+        )
         mower = self.hass.states.get(self.mower_entity_id) if self.mower_entity_id else None
         return _is_valid_state(temp) and _is_valid_state(mower)
 
@@ -546,7 +551,10 @@ class SmartMowingCoordinator:
                 blockers.append(BLOCKER_RAINING)
 
         recent_rain_amount = self._rain_in_last_hours(self.recent_rain_hours)
-        if self.rain_amount_entity_id is not None and recent_rain_amount > self.recent_rain_threshold:
+        if (
+            self.rain_amount_entity_id is not None
+            and recent_rain_amount > self.recent_rain_threshold
+        ):
             blockers.append(BLOCKER_RECENT_RAIN)
 
         if self.irrigation_entity_ids:
@@ -576,7 +584,9 @@ class SmartMowingCoordinator:
 
         if temp is not None:
             was_blocked = hyst_state.get(BLOCKER_HEAT, False)
-            if above_with_hysteresis(temp, self.heat_lockout_temp, self.hysteresis_temp, was_blocked):
+            if above_with_hysteresis(
+                temp, self.heat_lockout_temp, self.hysteresis_temp, was_blocked
+            ):
                 blockers.append(BLOCKER_HEAT)
 
         soil_moisture = _float_state(self.hass, self.soil_moisture_entity_id)
@@ -621,7 +631,11 @@ class SmartMowingCoordinator:
         blockers = self._apply_release_grace(raw_blockers, now)
 
         self.state.active_blockers = blockers
-        self.state.wet = BLOCKER_RAINING in raw_blockers or BLOCKER_DEW in raw_blockers or BLOCKER_RECENT_RAIN in raw_blockers
+        self.state.wet = (
+            BLOCKER_RAINING in raw_blockers
+            or BLOCKER_DEW in raw_blockers
+            or BLOCKER_RECENT_RAIN in raw_blockers
+        )
         self.state.mow_allowed = not blockers
         self.state.mow_needed = self.state.growth_index >= self.gdd_threshold
         self.state.need_percent = min(
@@ -664,7 +678,9 @@ class SmartMowingCoordinator:
 
         if mower_state == STATE_DOCKED and self.state.mower_started_by_us:
             self.state.mower_started_by_us = False
-            self.hass.bus.async_fire(EVENT_MOWING_COMPLETED, {"config_entry_id": self.entry.entry_id})
+            self.hass.bus.async_fire(
+                EVENT_MOWING_COMPLETED, {"config_entry_id": self.entry.entry_id}
+            )
 
         if not self.state.automatic_enabled:
             return

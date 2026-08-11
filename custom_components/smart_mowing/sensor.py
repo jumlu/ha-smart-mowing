@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from datetime import datetime
 
 from homeassistant.components.sensor import (
@@ -65,10 +66,8 @@ class GrowthIndexSensor(_BaseSensor, RestoreEntity):
         await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
         if last_state is not None and last_state.state not in ("unknown", "unavailable"):
-            try:
+            with contextlib.suppress(ValueError):
                 self.coordinator.restore_growth_index(float(last_state.state))
-            except ValueError:
-                pass
 
     @property
     def native_value(self) -> float:
@@ -106,10 +105,8 @@ class LastMowSensor(_BaseSensor, RestoreEntity):
         await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
         if last_state is not None and last_state.state not in ("unknown", "unavailable"):
-            try:
+            with contextlib.suppress(ValueError):
                 self.coordinator.restore_last_mow_time(datetime.fromisoformat(last_state.state))
-            except ValueError:
-                pass
 
     @property
     def native_value(self) -> datetime | None:

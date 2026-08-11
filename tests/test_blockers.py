@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-import pytest
+from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.smart_mowing.const import (
     BLOCKER_COOLDOWN,
-    BLOCKER_DEW,
     BLOCKER_HEAT,
     BLOCKER_OUTSIDE_WINDOW,
     BLOCKER_RAINING,
@@ -21,7 +20,6 @@ from custom_components.smart_mowing.const import (
     DOMAIN,
 )
 from custom_components.smart_mowing.coordinator import SmartMowingCoordinator
-from homeassistant.util import dt as dt_util
 
 MOWER_ENTITY = "lawn_mower.test_mower"
 TEMP_ENTITY = "sensor.test_temperature"

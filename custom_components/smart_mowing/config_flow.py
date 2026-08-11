@@ -135,7 +135,9 @@ def _step_irrigation_schema(defaults: dict[str, Any] | None = None) -> vol.Schem
             ),
             vol.Optional(
                 CONF_IRRIGATION_LOCKOUT_HOURS,
-                default=defaults.get(CONF_IRRIGATION_LOCKOUT_HOURS, DEFAULT_IRRIGATION_LOCKOUT_HOURS),
+                default=defaults.get(
+                    CONF_IRRIGATION_LOCKOUT_HOURS, DEFAULT_IRRIGATION_LOCKOUT_HOURS
+                ),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=0, max=48, step=0.5, unit_of_measurement="h")
             ),
@@ -151,16 +153,12 @@ class SmartMowingConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
 
-    async def async_step_reconfigure(
-        self, user_input: dict[str, Any] | None = None
-    ) -> Any:
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> Any:
         """Start reconfiguration, pre-filled with the entry's current data."""
         self._data = dict(self._get_reconfigure_entry().data)
         return await self.async_step_user()
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> Any:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> Any:
         errors: dict[str, str] = {}
         if user_input is not None:
             self._data.update(user_input)
@@ -169,19 +167,13 @@ class SmartMowingConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user", data_schema=_step_user_schema(self._data), errors=errors
         )
 
-    async def async_step_weather(
-        self, user_input: dict[str, Any] | None = None
-    ) -> Any:
+    async def async_step_weather(self, user_input: dict[str, Any] | None = None) -> Any:
         if user_input is not None:
             self._data.update(user_input)
             return await self.async_step_irrigation()
-        return self.async_show_form(
-            step_id="weather", data_schema=_step_weather_schema(self._data)
-        )
+        return self.async_show_form(step_id="weather", data_schema=_step_weather_schema(self._data))
 
-    async def async_step_irrigation(
-        self, user_input: dict[str, Any] | None = None
-    ) -> Any:
+    async def async_step_irrigation(self, user_input: dict[str, Any] | None = None) -> Any:
         if user_input is not None:
             self._data.update(user_input)
             if self.source == SOURCE_RECONFIGURE:
@@ -215,17 +207,19 @@ class SmartMowingOptionsFlow(OptionsFlow):
                     CONF_GDD_BASE_TEMP,
                     default=options.get(CONF_GDD_BASE_TEMP, DEFAULT_GDD_BASE_TEMP),
                 ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=-10, max=20, step=0.5, unit_of_measurement="°C")
+                    selector.NumberSelectorConfig(
+                        min=-10, max=20, step=0.5, unit_of_measurement="°C"
+                    )
                 ),
                 vol.Optional(
                     CONF_GDD_THRESHOLD,
                     default=options.get(CONF_GDD_THRESHOLD, DEFAULT_GDD_THRESHOLD),
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=500, step=1)
-                ),
+                ): selector.NumberSelector(selector.NumberSelectorConfig(min=1, max=500, step=1)),
                 vol.Optional(
                     CONF_MOW_WINDOW_START,
-                    default=options.get(CONF_MOW_WINDOW_START, DEFAULT_MOW_WINDOW_START.isoformat()),
+                    default=options.get(
+                        CONF_MOW_WINDOW_START, DEFAULT_MOW_WINDOW_START.isoformat()
+                    ),
                 ): selector.TimeSelector(),
                 vol.Optional(
                     CONF_MOW_WINDOW_END,
@@ -270,7 +264,9 @@ class SmartMowingOptionsFlow(OptionsFlow):
                     CONF_RAIN_STOP_THRESHOLD,
                     default=options.get(CONF_RAIN_STOP_THRESHOLD, DEFAULT_RAIN_STOP_THRESHOLD),
                 ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=20, step=0.1, unit_of_measurement="mm/h")
+                    selector.NumberSelectorConfig(
+                        min=0, max=20, step=0.1, unit_of_measurement="mm/h"
+                    )
                 ),
                 vol.Optional(
                     CONF_RECENT_RAIN_HOURS,
@@ -280,9 +276,7 @@ class SmartMowingOptionsFlow(OptionsFlow):
                 ),
                 vol.Optional(
                     CONF_RECENT_RAIN_THRESHOLD,
-                    default=options.get(
-                        CONF_RECENT_RAIN_THRESHOLD, DEFAULT_RECENT_RAIN_THRESHOLD
-                    ),
+                    default=options.get(CONF_RECENT_RAIN_THRESHOLD, DEFAULT_RECENT_RAIN_THRESHOLD),
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=0, max=50, step=0.1, unit_of_measurement="mm")
                 ),
@@ -314,9 +308,7 @@ class SmartMowingOptionsFlow(OptionsFlow):
                 ),
                 vol.Optional(
                     CONF_RELEASE_GRACE_MINUTES,
-                    default=options.get(
-                        CONF_RELEASE_GRACE_MINUTES, DEFAULT_RELEASE_GRACE_MINUTES
-                    ),
+                    default=options.get(CONF_RELEASE_GRACE_MINUTES, DEFAULT_RELEASE_GRACE_MINUTES),
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=0, max=180, step=5, unit_of_measurement="min")
                 ),

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from custom_components.smart_mowing.const import NO_SOIL_SENSOR_DROUGHT_FACTOR
 from custom_components.smart_mowing.coordinator import (
     above_with_hysteresis,
     below_with_hysteresis,
@@ -11,7 +12,6 @@ from custom_components.smart_mowing.coordinator import (
     compute_daily_gdd,
     compute_growth_factor,
 )
-from custom_components.smart_mowing.const import NO_SOIL_SENSOR_DROUGHT_FACTOR
 
 
 def test_clamp():
