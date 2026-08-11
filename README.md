@@ -16,12 +16,17 @@ schedule. It works with any `lawn_mower` entity, regardless of vendor.
 1. HACS → Integrations → ⋮ → Custom repositories → add this repository URL, category
    "Integration".
 2. Install "Smart Mowing", restart Home Assistant.
-3. Settings → Devices & Services → Add Integration → search "Smart Mowing".
+3. Settings → Devices & Services → **Helpers** tab → Create Helper → search "Smart Mowing".
 
 This repository is not (yet) in the default HACS store, so it has to be added as a custom
 repository. It also has no icon in [home-assistant/brands](https://github.com/home-assistant/brands)
 yet — that's a separate PR against that repository and only affects the icon shown in HACS/the UI,
 not functionality.
+
+> **Note:** Smart Mowing is typed as a `helper` integration (like `generic_thermostat`), so its
+> config entries are set up via the **Helpers** tab, not "+ Add Integration". Once set up, look for
+> the resulting device — named after whatever you called the lawn area (e.g. "Smart Mowing
+> Controller") — under Settings → Devices & Services → **Devices**, not under the Integrations tab.
 
 ## Setup (Config Flow)
 
