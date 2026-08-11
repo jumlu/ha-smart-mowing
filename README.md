@@ -4,7 +4,7 @@ Home Assistant custom integration that decides **when** a `lawn_mower` entity sh
 grass growth and weather — instead of a dumb daily schedule. It works with any `lawn_mower` entity,
 regardless of vendor.
 
-- Mows only once the lawn has actually grown enough (Growing Degree Days model).
+- Mows only once the lawn has actually grown enough (PACE Turf Growth Potential model).
 - Never mows onto wet grass (rain, recent rain, dew).
 - Aborts a running mow if rain starts, and docks the mower.
 - Respects a mow-window, weekdays, heat lockout, drought lockout, irrigation lockout and a
@@ -13,8 +13,10 @@ regardless of vendor.
 
 ## Installation via HACS
 
-1. HACS → Integrations → ⋮ → Custom repositories → add this repository URL, category
-   "Integration".
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jumlu&repository=ha-smart-mowing&category=Integration)
+
+1. Click the badge above (or HACS → Integrations → ⋮ → Custom repositories → add this repository
+   URL, category "Integration").
 2. Install "Smart Mowing", restart Home Assistant.
 3. Settings → Devices & Services → **+ Add Integration** → search "Smart Mowing".
 
