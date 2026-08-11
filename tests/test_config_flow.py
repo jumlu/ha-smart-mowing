@@ -1,0 +1,74 @@
+"""Tests for the Smart Mowing config flow."""
+
+from __future__ import annotations
+
+from homeassistant import config_entries
+from homeassistant.data_entry_flow import FlowResultType
+
+from custom_components.smart_mowing.const import (
+    CONF_MOWER_ENTITY,
+    CONF_NAME,
+    CONF_TEMPERATURE_ENTITY,
+    DOMAIN,
+)
+
+MOWER_ENTITY = "lawn_mower.test_mower"
+TEMP_ENTITY = "sensor.test_temperature"
+
+
+async def test_full_flow_minimal(hass):
+    hass.states.async_set(MOWER_ENTITY, "docked")
+    hass.states.async_set(TEMP_ENTITY, "15")
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "user"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_NAME: "Front Lawn",
+            CONF_MOWER_ENTITY: MOWER_ENTITY,
+            CONF_TEMPERATURE_ENTITY: TEMP_ENTITY,
+        },
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "weather"
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "irrigation"
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Front Lawn"
+    assert result["data"][CONF_MOWER_ENTITY] == MOWER_ENTITY
+
+
+async def test_duplicate_name_aborts(hass):
+    hass.states.async_set(MOWER_ENTITY, "docked")
+    hass.states.async_set(TEMP_ENTITY, "15")
+
+    async def _run_flow():
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_NAME: "Front Lawn",
+                CONF_MOWER_ENTITY: MOWER_ENTITY,
+                CONF_TEMPERATURE_ENTITY: TEMP_ENTITY,
+            },
+        )
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        return await hass.config_entries.flow.async_configure(result["flow_id"], {})
+
+    first = await _run_flow()
+    assert first["type"] is FlowResultType.CREATE_ENTRY
+
+    second = await _run_flow()
+    assert second["type"] is FlowResultType.ABORT
+    assert second["reason"] == "already_configured"

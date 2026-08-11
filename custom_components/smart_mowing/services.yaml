@@ -1,0 +1,33 @@
+force_mow:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          domain: sensor
+          integration: smart_mowing
+
+reset_growth:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          domain: sensor
+          integration: smart_mowing
+
+set_growth:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          domain: sensor
+          integration: smart_mowing
+    value:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 0.1

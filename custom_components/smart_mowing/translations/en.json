@@ -1,0 +1,117 @@
+{
+  "title": "Smart Mowing",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Smart Mowing: lawn area",
+        "description": "Basic setup: name, mower and temperature sensor.",
+        "data": {
+          "name": "Name",
+          "mower_entity": "Mower",
+          "temperature_entity": "Temperature sensor"
+        }
+      },
+      "weather": {
+        "title": "Weather sensors (optional, recommended)",
+        "description": "Leave fields empty if a sensor is not available yet.",
+        "data": {
+          "rain_rate_entity": "Rain rate sensor (mm/h)",
+          "rain_amount_entity": "Rain amount sensor (mm, daily/24h)",
+          "humidity_entity": "Humidity sensor",
+          "dewpoint_entity": "Dew point sensor",
+          "soil_moisture_entity": "Soil moisture sensor (%)",
+          "solar_radiation_entity": "Solar radiation sensor (W/m²)"
+        }
+      },
+      "irrigation": {
+        "title": "Irrigation (optional)",
+        "data": {
+          "irrigation_entities": "Irrigation entities",
+          "irrigation_lockout_hours": "Lockout after irrigation ends (h)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This lawn area is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Smart Mowing thresholds",
+        "data": {
+          "gdd_base_temp": "GDD base temperature",
+          "gdd_threshold": "GDD threshold for mow need",
+          "mow_window_start": "Mow window start",
+          "mow_window_end": "Mow window end",
+          "allowed_weekdays": "Allowed weekdays",
+          "min_mow_interval_hours": "Minimum interval between mows (h)",
+          "heat_lockout_temp": "Heat lockout above (°C)",
+          "drought_soil_moisture_threshold": "Drought: soil moisture below (%)",
+          "drought_no_rain_days": "Drought: no rain for (days)",
+          "rain_stop_threshold": "Rain stop threshold (mm/h)",
+          "recent_rain_hours": "Recent rain window (h)",
+          "recent_rain_threshold": "Recent rain threshold (mm)",
+          "dewpoint_spread_min": "Minimum dew point spread (K)",
+          "hysteresis_temp": "Temperature hysteresis (°C)",
+          "hysteresis_dewpoint": "Dew point hysteresis (K)",
+          "hysteresis_soil_moisture": "Soil moisture hysteresis (%)",
+          "release_grace_minutes": "Release grace period (min)",
+          "only_dock_own_runs": "Only dock runs started by Smart Mowing"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "growth_index": { "name": "Growth index" },
+      "mow_need": { "name": "Mow need" },
+      "last_mow": { "name": "Last mow" },
+      "next_mow": { "name": "Next mow (forecast)" }
+    },
+    "binary_sensor": {
+      "mowing_allowed": { "name": "Mowing allowed" },
+      "grass_wet": { "name": "Grass wet" }
+    },
+    "switch": {
+      "automatic": { "name": "Automatic" }
+    }
+  },
+  "services": {
+    "force_mow": {
+      "name": "Force mow",
+      "description": "Start mowing now, bypassing all blockers.",
+      "fields": {
+        "entity_id": { "name": "Entity", "description": "Any Smart Mowing entity of the target lawn area." }
+      }
+    },
+    "reset_growth": {
+      "name": "Reset growth index",
+      "description": "Set the growth index back to 0, e.g. after manual mowing.",
+      "fields": {
+        "entity_id": { "name": "Entity", "description": "Any Smart Mowing entity of the target lawn area." }
+      }
+    },
+    "set_growth": {
+      "name": "Set growth index",
+      "description": "Calibrate the growth index to a specific value.",
+      "fields": {
+        "entity_id": { "name": "Entity", "description": "Any Smart Mowing entity of the target lawn area." },
+        "value": { "name": "Value", "description": "New growth index value (GDD)." }
+      }
+    }
+  },
+  "blockers": {
+    "outside_window": "Outside the mow window",
+    "raining": "It is raining",
+    "recent_rain": "Rain recently",
+    "irrigation_active": "Irrigation active",
+    "irrigation_recent": "Irrigation ended recently",
+    "dew": "Dew on the grass",
+    "heat": "Too hot",
+    "drought": "Drought lockout",
+    "cooldown": "Mowed recently",
+    "unavailable_source": "A required sensor is unavailable",
+    "grace_period": "Waiting for the grass to dry"
+  }
+}

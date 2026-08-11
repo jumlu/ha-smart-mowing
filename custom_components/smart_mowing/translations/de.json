@@ -1,0 +1,117 @@
+{
+  "title": "Smart Mowing",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Smart Mowing: Rasenfläche",
+        "description": "Grundeinrichtung: Name, Mäher und Temperatursensor.",
+        "data": {
+          "name": "Name",
+          "mower_entity": "Mäher",
+          "temperature_entity": "Temperatursensor"
+        }
+      },
+      "weather": {
+        "title": "Wettersensoren (optional, empfohlen)",
+        "description": "Felder leer lassen, wenn ein Sensor noch nicht verfügbar ist.",
+        "data": {
+          "rain_rate_entity": "Regenraten-Sensor (mm/h)",
+          "rain_amount_entity": "Regenmengen-Sensor (mm, Tag/24h)",
+          "humidity_entity": "Luftfeuchte-Sensor",
+          "dewpoint_entity": "Taupunkt-Sensor",
+          "soil_moisture_entity": "Bodenfeuchte-Sensor (%)",
+          "solar_radiation_entity": "Solarstrahlungs-Sensor (W/m²)"
+        }
+      },
+      "irrigation": {
+        "title": "Bewässerung (optional)",
+        "data": {
+          "irrigation_entities": "Bewässerungs-Entities",
+          "irrigation_lockout_hours": "Sperrdauer nach Bewässerungsende (h)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Diese Rasenfläche ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Smart Mowing Schwellwerte",
+        "data": {
+          "gdd_base_temp": "GDD-Basistemperatur",
+          "gdd_threshold": "GDD-Schwelle für Mähbedarf",
+          "mow_window_start": "Mähfenster Start",
+          "mow_window_end": "Mähfenster Ende",
+          "allowed_weekdays": "Erlaubte Wochentage",
+          "min_mow_interval_hours": "Mindestabstand zwischen Mähvorgängen (h)",
+          "heat_lockout_temp": "Hitze-Sperre ab (°C)",
+          "drought_soil_moisture_threshold": "Trockenheit: Bodenfeuchte unter (%)",
+          "drought_no_rain_days": "Trockenheit: kein Regen seit (Tagen)",
+          "rain_stop_threshold": "Regen-Stop-Schwelle (mm/h)",
+          "recent_rain_hours": "Zeitfenster kürzlicher Regen (h)",
+          "recent_rain_threshold": "Schwelle kürzlicher Regen (mm)",
+          "dewpoint_spread_min": "Mindest-Taupunktabstand (K)",
+          "hysteresis_temp": "Hysterese Temperatur (°C)",
+          "hysteresis_dewpoint": "Hysterese Taupunkt (K)",
+          "hysteresis_soil_moisture": "Hysterese Bodenfeuchte (%)",
+          "release_grace_minutes": "Karenzzeit nach Sperr-Ende (min)",
+          "only_dock_own_runs": "Nur eigene Mähvorgänge abdocken"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "growth_index": { "name": "Wachstumsindex" },
+      "mow_need": { "name": "Mähbedarf" },
+      "last_mow": { "name": "Letzter Mähvorgang" },
+      "next_mow": { "name": "Nächster Mähvorgang (Prognose)" }
+    },
+    "binary_sensor": {
+      "mowing_allowed": { "name": "Mähen erlaubt" },
+      "grass_wet": { "name": "Gras nass" }
+    },
+    "switch": {
+      "automatic": { "name": "Automatik" }
+    }
+  },
+  "services": {
+    "force_mow": {
+      "name": "Mähen erzwingen",
+      "description": "Startet den Mähvorgang sofort, unter Umgehung aller Sperren.",
+      "fields": {
+        "entity_id": { "name": "Entity", "description": "Eine beliebige Smart-Mowing-Entity der Ziel-Rasenfläche." }
+      }
+    },
+    "reset_growth": {
+      "name": "Wachstumsindex zurücksetzen",
+      "description": "Setzt den Wachstumsindex auf 0, z. B. nach manuellem Mähen.",
+      "fields": {
+        "entity_id": { "name": "Entity", "description": "Eine beliebige Smart-Mowing-Entity der Ziel-Rasenfläche." }
+      }
+    },
+    "set_growth": {
+      "name": "Wachstumsindex setzen",
+      "description": "Kalibriert den Wachstumsindex auf einen bestimmten Wert.",
+      "fields": {
+        "entity_id": { "name": "Entity", "description": "Eine beliebige Smart-Mowing-Entity der Ziel-Rasenfläche." },
+        "value": { "name": "Wert", "description": "Neuer Wachstumsindex-Wert (GDD)." }
+      }
+    }
+  },
+  "blockers": {
+    "outside_window": "Außerhalb des Mähfensters",
+    "raining": "Es regnet",
+    "recent_rain": "Kürzlich geregnet",
+    "irrigation_active": "Bewässerung aktiv",
+    "irrigation_recent": "Bewässerung kürzlich beendet",
+    "dew": "Tau auf dem Rasen",
+    "heat": "Zu heiß",
+    "drought": "Trockenheits-Sperre",
+    "cooldown": "Kürzlich gemäht",
+    "unavailable_source": "Eine benötigte Sensorquelle ist nicht verfügbar",
+    "grace_period": "Warte auf Abtrocknung"
+  }
+}
