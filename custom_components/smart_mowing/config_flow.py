@@ -114,10 +114,16 @@ def _step_weather_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
         {
             vol.Optional(
                 CONF_RAIN_RATE_ENTITY, **_suggest(defaults, CONF_RAIN_RATE_ENTITY)
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="sensor", device_class="precipitation_intensity"
+                )
+            ),
             vol.Optional(
                 CONF_RAIN_AMOUNT_ENTITY, **_suggest(defaults, CONF_RAIN_AMOUNT_ENTITY)
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor", device_class="precipitation")
+            ),
             vol.Optional(
                 CONF_HUMIDITY_ENTITY, **_suggest(defaults, CONF_HUMIDITY_ENTITY)
             ): selector.EntitySelector(
@@ -125,13 +131,19 @@ def _step_weather_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
             ),
             vol.Optional(
                 CONF_DEWPOINT_ENTITY, **_suggest(defaults, CONF_DEWPOINT_ENTITY)
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
+            ),
             vol.Optional(
                 CONF_SOIL_MOISTURE_ENTITY, **_suggest(defaults, CONF_SOIL_MOISTURE_ENTITY)
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor", device_class="moisture")
+            ),
             vol.Optional(
                 CONF_SOLAR_RADIATION_ENTITY, **_suggest(defaults, CONF_SOLAR_RADIATION_ENTITY)
-            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor", device_class="irradiance")
+            ),
         }
     )
 

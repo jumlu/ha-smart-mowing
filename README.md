@@ -33,7 +33,11 @@ The setup dialog has three steps, one config entry per lawn area:
 1. **Basics (required):** name, mower entity, temperature sensor.
    <!-- screenshot: config-flow-step-1.png -->
 2. **Weather (optional, recommended):** rain rate, rain amount, humidity, dew point, soil
-   moisture, solar radiation.
+   moisture, solar radiation. Each picker is filtered to sensors with the matching HA device
+   class (e.g. rain rate only shows `precipitation_intensity`/mm-per-hour sensors, not
+   `precipitation`/mm accumulators) — if your sensor isn't offered, its integration likely
+   doesn't set that device class, and picking the wrong-unit sensor by name alone would silently
+   feed the wrong physical quantity into the growth/blocker math.
    <!-- screenshot: config-flow-step-2.png -->
 3. **Irrigation (optional):** irrigation entities (any domain) and a lockout duration after
    irrigation ends.
