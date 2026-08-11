@@ -70,7 +70,26 @@
       "next_mow": { "name": "Nächster Mähvorgang (Prognose)" }
     },
     "binary_sensor": {
-      "mowing_allowed": { "name": "Mähen erlaubt" },
+      "mowing_allowed": {
+        "name": "Mähen erlaubt",
+        "state_attributes": {
+          "blockers": {
+            "state": {
+              "outside_window": "Außerhalb des Mähfensters",
+              "raining": "Es regnet",
+              "recent_rain": "Kürzlich geregnet",
+              "irrigation_active": "Bewässerung aktiv",
+              "irrigation_recent": "Bewässerung kürzlich beendet",
+              "dew": "Tau auf dem Rasen",
+              "heat": "Zu heiß",
+              "drought": "Trockenheits-Sperre",
+              "cooldown": "Kürzlich gemäht",
+              "unavailable_source": "Eine benötigte Sensorquelle ist nicht verfügbar",
+              "grace_period": "Warte auf Abtrocknung"
+            }
+          }
+        }
+      },
       "grass_wet": { "name": "Gras nass" }
     },
     "switch": {
@@ -100,18 +119,5 @@
         "value": { "name": "Wert", "description": "Neuer Wachstumsindex-Wert (GDD)." }
       }
     }
-  },
-  "blockers": {
-    "outside_window": "Außerhalb des Mähfensters",
-    "raining": "Es regnet",
-    "recent_rain": "Kürzlich geregnet",
-    "irrigation_active": "Bewässerung aktiv",
-    "irrigation_recent": "Bewässerung kürzlich beendet",
-    "dew": "Tau auf dem Rasen",
-    "heat": "Zu heiß",
-    "drought": "Trockenheits-Sperre",
-    "cooldown": "Kürzlich gemäht",
-    "unavailable_source": "Eine benötigte Sensorquelle ist nicht verfügbar",
-    "grace_period": "Warte auf Abtrocknung"
   }
 }

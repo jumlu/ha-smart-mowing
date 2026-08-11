@@ -70,7 +70,26 @@
       "next_mow": { "name": "Next mow (forecast)" }
     },
     "binary_sensor": {
-      "mowing_allowed": { "name": "Mowing allowed" },
+      "mowing_allowed": {
+        "name": "Mowing allowed",
+        "state_attributes": {
+          "blockers": {
+            "state": {
+              "outside_window": "Outside the mow window",
+              "raining": "It is raining",
+              "recent_rain": "Rain recently",
+              "irrigation_active": "Irrigation active",
+              "irrigation_recent": "Irrigation ended recently",
+              "dew": "Dew on the grass",
+              "heat": "Too hot",
+              "drought": "Drought lockout",
+              "cooldown": "Mowed recently",
+              "unavailable_source": "A required sensor is unavailable",
+              "grace_period": "Waiting for the grass to dry"
+            }
+          }
+        }
+      },
       "grass_wet": { "name": "Grass wet" }
     },
     "switch": {
@@ -100,18 +119,5 @@
         "value": { "name": "Value", "description": "New growth index value (GDD)." }
       }
     }
-  },
-  "blockers": {
-    "outside_window": "Outside the mow window",
-    "raining": "It is raining",
-    "recent_rain": "Rain recently",
-    "irrigation_active": "Irrigation active",
-    "irrigation_recent": "Irrigation ended recently",
-    "dew": "Dew on the grass",
-    "heat": "Too hot",
-    "drought": "Drought lockout",
-    "cooldown": "Mowed recently",
-    "unavailable_source": "A required sensor is unavailable",
-    "grace_period": "Waiting for the grass to dry"
   }
 }
