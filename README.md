@@ -1,8 +1,8 @@
 # Smart Mowing
 
-Home Assistant custom integration (helper-style, like `generic_thermostat`) that decides **when**
-a `lawn_mower` entity should run, based on grass growth and weather — instead of a dumb daily
-schedule. It works with any `lawn_mower` entity, regardless of vendor.
+Home Assistant custom integration that decides **when** a `lawn_mower` entity should run, based on
+grass growth and weather — instead of a dumb daily schedule. It works with any `lawn_mower` entity,
+regardless of vendor.
 
 - Mows only once the lawn has actually grown enough (Growing Degree Days model).
 - Never mows onto wet grass (rain, recent rain, dew).
@@ -23,12 +23,8 @@ repository. It also has no icon in [home-assistant/brands](https://github.com/ho
 yet — that's a separate PR against that repository and only affects the icon shown in HACS/the UI,
 not functionality.
 
-> **Note:** Smart Mowing is typed as a `helper` integration (like `generic_thermostat`), so once
-> set up it does **not** show up in the main Settings → Devices & Services → **Integrations** list,
-> nor in the **Helpers** tab (that tab only lists built-in HA helper platforms, not custom ones).
-> To find it again later — e.g. to reconfigure it — go to Settings → Devices & Services →
-> **Devices**, open the "Smart Mowing Controller" device, and follow the link to its integration
-> entry from there.
+Each config entry shows up as a card under Settings → Devices & Services → **Integrations**, with
+the resulting device (e.g. "Smart Mowing Controller") grouping all of its entities underneath.
 
 ## Setup (Config Flow)
 
@@ -96,25 +92,21 @@ All entities of a config entry are grouped under one device.
 ## Reconfiguration and removal
 
 Every field from the setup dialog — mower, temperature sensor, all weather and irrigation entities
-— can be changed later via the config entry's **Reconfigure** option. Since the entry doesn't show
-in the main Integrations list (see the note above), reach it via Settings → Devices & Services →
-**Devices** → the "Smart Mowing Controller" device → follow the link to its integration entry → ⋮
-→ Reconfigure. This re-opens the same three-step setup dialog, prefilled with your current values,
-without deleting and recreating the entry. Threshold-only changes belong in **Configure** (options
-flow) instead, reachable the same way.
+— can be changed later via the config entry's **Reconfigure** option (Settings → Devices & Services
+→ Smart Mowing → the lawn area → ⋮ → Reconfigure), without deleting and recreating the entry.
+Threshold-only changes belong in **Configure** (options flow) instead.
 
-To remove a lawn area, delete its config entry the same way (⋮ → Delete). This unloads the entities
-and stops the integration from acting on the configured mower; it does not change any state on the
-mower or weather integrations themselves, since Smart Mowing only reads their entities and calls
-their services — it doesn't own or configure them.
+To remove a lawn area, delete its config entry from Settings → Devices & Services. This unloads
+the entities and stops the integration from acting on the configured mower; it does not change any
+state on the mower or weather integrations themselves, since Smart Mowing only reads their entities
+and calls their services — it doesn't own or configure them.
 
 ## Troubleshooting
 
-From the integration entry (Settings → Devices & Services → Devices → the lawn area's device →
-follow the link to its integration entry → ⋮ → **Download diagnostics**), download a snapshot of
-the current configuration, every source entity's live value, and the coordinator's internal state
-(growth index, active blockers, whether the current mow was started by this integration, ...).
-That's the first thing to check before filing an issue.
+Download **Settings → Devices & Services → Smart Mowing → the lawn area → Download diagnostics**
+for a snapshot of the current configuration, every source entity's live value, and the coordinator's
+internal state (growth index, active blockers, whether the current mow was started by this
+integration, ...). That's the first thing to check before filing an issue.
 
 - **Nothing happens at all:** check `switch.<name>_automatic` is on, and check
   `binary_sensor.<name>_mowing_allowed`'s `blockers` attribute for the active lockout(s).
@@ -136,13 +128,11 @@ That's the first thing to check before filing an issue.
 integration mows purely on a growth schedule inside the configured mow window. Every additional
 sensor removes a blind spot (rain, drought, dew, irrigation).
 
-**How do I change the temperature sensor, or add a rain sensor, after setup?** The entry doesn't
-show in the main Integrations list (see the installation note above) — reach it via Settings →
-Devices & Services → **Devices** → the "Smart Mowing Controller" device → follow the link to its
-integration entry → ⋮ → **Reconfigure**. This re-opens the same three-step setup dialog, prefilled
-with your current values — change the temperature sensor in step 1, or add/change the rain rate
-sensor and any other weather sensor in step 2. The entry, its entities, and their history stay
-intact; nothing needs to be deleted and recreated.
+**How do I change the temperature sensor, or add a rain sensor, after setup?** Settings → Devices
+& Services → Smart Mowing → the lawn area → ⋮ → **Reconfigure**. This re-opens the same three-step
+setup dialog, prefilled with your current values — change the temperature sensor in step 1, or
+add/change the rain rate sensor and any other weather sensor in step 2. The entry, its entities,
+and their history stay intact; nothing needs to be deleted and recreated.
 
 **Why does `sensor.<name>_next_mow` (the forecast) change so often?** It's recomputed as "now +
 estimated days remaining" on every evaluation, and evaluation runs on every state change of any
