@@ -5,7 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
+from homeassistant.config_entries import (
+    SOURCE_RECONFIGURE,
+    ConfigEntry,
+    ConfigFlow,
+    OptionsFlow,
+)
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 
@@ -72,55 +77,65 @@ WEEKDAY_OPTIONS = [
 ]
 
 
-def _step_user_schema() -> vol.Schema:
+def _step_user_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
+    defaults = defaults or {}
     return vol.Schema(
         {
-            vol.Required(CONF_NAME): selector.TextSelector(),
-            vol.Required(CONF_MOWER_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="lawn_mower")
-            ),
-            vol.Required(CONF_TEMPERATURE_ENTITY): selector.EntitySelector(
+            vol.Required(CONF_NAME, default=defaults.get(CONF_NAME)): selector.TextSelector(),
+            vol.Required(
+                CONF_MOWER_ENTITY, default=defaults.get(CONF_MOWER_ENTITY)
+            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="lawn_mower")),
+            vol.Required(
+                CONF_TEMPERATURE_ENTITY, default=defaults.get(CONF_TEMPERATURE_ENTITY)
+            ): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
             ),
         }
     )
 
 
-def _step_weather_schema() -> vol.Schema:
+def _step_weather_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
+    defaults = defaults or {}
     return vol.Schema(
         {
-            vol.Optional(CONF_RAIN_RATE_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_RAIN_AMOUNT_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_HUMIDITY_ENTITY): selector.EntitySelector(
+            vol.Optional(
+                CONF_RAIN_RATE_ENTITY, default=defaults.get(CONF_RAIN_RATE_ENTITY)
+            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+            vol.Optional(
+                CONF_RAIN_AMOUNT_ENTITY, default=defaults.get(CONF_RAIN_AMOUNT_ENTITY)
+            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+            vol.Optional(
+                CONF_HUMIDITY_ENTITY, default=defaults.get(CONF_HUMIDITY_ENTITY)
+            ): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", device_class="humidity")
             ),
-            vol.Optional(CONF_DEWPOINT_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_SOIL_MOISTURE_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_SOLAR_RADIATION_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
+            vol.Optional(
+                CONF_DEWPOINT_ENTITY, default=defaults.get(CONF_DEWPOINT_ENTITY)
+            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+            vol.Optional(
+                CONF_SOIL_MOISTURE_ENTITY, default=defaults.get(CONF_SOIL_MOISTURE_ENTITY)
+            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+            vol.Optional(
+                CONF_SOLAR_RADIATION_ENTITY, default=defaults.get(CONF_SOLAR_RADIATION_ENTITY)
+            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
         }
     )
 
 
-def _step_irrigation_schema() -> vol.Schema:
+def _step_irrigation_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
+    defaults = defaults or {}
     return vol.Schema(
         {
-            vol.Optional(CONF_IRRIGATION_ENTITIES): selector.EntitySelector(
+            vol.Optional(
+                CONF_IRRIGATION_ENTITIES, default=defaults.get(CONF_IRRIGATION_ENTITIES)
+            ): selector.EntitySelector(
                 selector.EntitySelectorConfig(
                     domain=["switch", "binary_sensor", "valve"], multiple=True
                 )
             ),
             vol.Optional(
-                CONF_IRRIGATION_LOCKOUT_HOURS, default=DEFAULT_IRRIGATION_LOCKOUT_HOURS
+                CONF_IRRIGATION_LOCKOUT_HOURS,
+                default=defaults.get(CONF_IRRIGATION_LOCKOUT_HOURS, DEFAULT_IRRIGATION_LOCKOUT_HOURS),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=0, max=48, step=0.5, unit_of_measurement="h")
             ),
@@ -136,6 +151,13 @@ class SmartMowingConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
+        """Start reconfiguration, pre-filled with the entry's current data."""
+        self._data = dict(self._get_reconfigure_entry().data)
+        return await self.async_step_user()
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> Any:
@@ -144,7 +166,7 @@ class SmartMowingConfigFlow(ConfigFlow, domain=DOMAIN):
             self._data.update(user_input)
             return await self.async_step_weather()
         return self.async_show_form(
-            step_id="user", data_schema=_step_user_schema(), errors=errors
+            step_id="user", data_schema=_step_user_schema(self._data), errors=errors
         )
 
     async def async_step_weather(
@@ -153,17 +175,25 @@ class SmartMowingConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._data.update(user_input)
             return await self.async_step_irrigation()
-        return self.async_show_form(step_id="weather", data_schema=_step_weather_schema())
+        return self.async_show_form(
+            step_id="weather", data_schema=_step_weather_schema(self._data)
+        )
 
     async def async_step_irrigation(
         self, user_input: dict[str, Any] | None = None
     ) -> Any:
         if user_input is not None:
             self._data.update(user_input)
+            if self.source == SOURCE_RECONFIGURE:
+                return self.async_update_reload_and_abort(
+                    self._get_reconfigure_entry(), data=self._data
+                )
             await self.async_set_unique_id(f"{DOMAIN}_{self._data[CONF_NAME]}")
             self._abort_if_unique_id_configured()
             return self.async_create_entry(title=self._data[CONF_NAME], data=self._data)
-        return self.async_show_form(step_id="irrigation", data_schema=_step_irrigation_schema())
+        return self.async_show_form(
+            step_id="irrigation", data_schema=_step_irrigation_schema(self._data)
+        )
 
     @staticmethod
     @callback

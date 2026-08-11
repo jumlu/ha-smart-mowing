@@ -32,7 +32,8 @@
       }
     },
     "abort": {
-      "already_configured": "Diese Rasenfläche ist bereits eingerichtet."
+      "already_configured": "Diese Rasenfläche ist bereits eingerichtet.",
+      "reconfigure_successful": "Die Neukonfiguration war erfolgreich."
     }
   },
   "options": {

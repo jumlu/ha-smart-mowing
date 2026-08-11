@@ -47,15 +47,15 @@ decision more precise, but nothing is required beyond that minimal setup.
 
 Grass growth roughly tracks accumulated warmth above a base temperature at which growth starts
 (cool-season grasses: ~5 °C). Each day, the integration computes
-`gdd = max(0, tagesmitteltemperatur - basistemperatur)` from a running average of the configured
-temperature sensor, and adds it to a `wachstumsindex` (growth index) accumulator at midnight. Once
+`gdd = max(0, daily_average_temperature - base_temperature)` from a running average of the
+configured temperature sensor, and adds it to a `growth_index` accumulator at midnight. Once
 the accumulator reaches the configured threshold (default 50 GDD), the lawn is considered ready to
 mow. The accumulator resets to 0 only after a *successful* mow — a mow aborted by rain leaves the
 accumulated progress untouched, since the grass didn't stop growing just because the mower got
 interrupted.
 
 If a soil-moisture sensor is configured, the daily GDD contribution is scaled down proportionally
-to how dry the soil is (`bodenfeuchte / trockenheits_schwelle`, clamped to `[0, 1]`) — grass grows
+to how dry the soil is (`soil_moisture / drought_threshold`, clamped to `[0, 1]`) — grass grows
 slower when water is limited, whether or not there's a hard drought lockout in effect. Without a
 soil sensor but with a rain-amount sensor, growth is dampened by a fixed factor after a configured
 number of rain-free days. This means the "don't mow during a hot, dry spell" behaviour falls out
@@ -85,6 +85,39 @@ All entities of a config entry are grouped under one device.
 ## Events
 
 - `smart_mowing_started`, `smart_mowing_aborted` (with `reason`), `smart_mowing_completed`.
+
+## Reconfiguration and removal
+
+Every field from the setup dialog — mower, temperature sensor, all weather and irrigation entities
+— can be changed later via the config entry's **Reconfigure** option (Settings → Devices & Services
+→ Smart Mowing → the lawn area → ⋮ → Reconfigure), without deleting and recreating the entry.
+Threshold-only changes belong in **Configure** (options flow) instead.
+
+To remove a lawn area, delete its config entry from Settings → Devices & Services. This unloads
+the entities and stops the integration from acting on the configured mower; it does not change any
+state on the mower or weather integrations themselves, since Smart Mowing only reads their entities
+and calls their services — it doesn't own or configure them.
+
+## Troubleshooting
+
+Download **Settings → Devices & Services → Smart Mowing → the lawn area → Download diagnostics**
+for a snapshot of the current configuration, every source entity's live value, and the coordinator's
+internal state (growth index, active blockers, whether the current mow was started by this
+integration, ...). That's the first thing to check before filing an issue.
+
+- **Nothing happens at all:** check `switch.<name>_automatic` is on, and check
+  `binary_sensor.<name>_mowing_allowed`'s `blockers` attribute for the active lockout(s).
+- **A required sensor shows `unavailable_source` in blockers:** the mower or temperature entity is
+  `unknown`/`unavailable` — the integration refuses to decide without them rather than guessing.
+- **Growth index looks wrong after a restart:** it's restored via each entity's last recorded
+  state; if the growth index sensor was unavailable for a long time before restart (e.g. the
+  integration was reloaded mid-day), the restored value only reflects whatever was last written.
+- **The mower keeps getting docked:** check for `smart_mowing_aborted` events and their `reason` —
+  usually `raining`. If it's docking mows you started manually, verify "Only dock runs started by
+  Smart Mowing" is enabled in the options.
+- Log messages from this integration are tagged `custom_components.smart_mowing` — enable debug
+  logging for that logger under Settings → System → Logs if you need more detail than diagnostics
+  provides.
 
 ## FAQ
 

@@ -4,19 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
-from .coordinator import SmartMowingCoordinator
+from . import SmartMowingConfigEntry
 
 TO_REDACT: set[str] = set()
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: ConfigEntry
+    hass: HomeAssistant, entry: SmartMowingConfigEntry
 ) -> dict[str, Any]:
-    coordinator: SmartMowingCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     source_entities = {
         "mower_entity": coordinator.mower_entity_id,

@@ -32,7 +32,8 @@
       }
     },
     "abort": {
-      "already_configured": "This lawn area is already configured."
+      "already_configured": "This lawn area is already configured.",
+      "reconfigure_successful": "Reconfiguration was successful."
     }
   },
   "options": {

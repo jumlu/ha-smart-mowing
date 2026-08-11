@@ -10,14 +10,14 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN
+from . import SmartMowingConfigEntry
 from .coordinator import SmartMowingCoordinator
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant, entry: SmartMowingConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    coordinator: SmartMowingCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     async_add_entities([AutomaticSwitch(coordinator, entry)])
 
 

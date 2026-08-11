@@ -16,6 +16,7 @@ from typing import Any
 
 from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.event import (
     async_track_state_change_event,
@@ -353,6 +354,11 @@ class SmartMowingCoordinator:
         """Register a callback invoked after every re-evaluation."""
         self._update_listeners.append(listener)
 
+    def notify_listeners(self) -> None:
+        """Push current state to every registered entity listener."""
+        for listener in self._update_listeners:
+            listener()
+
     async def async_setup(self) -> None:
         entities_to_watch = [
             eid
@@ -626,8 +632,7 @@ class SmartMowingCoordinator:
 
         await self._async_maybe_act(raw_blockers, now)
 
-        for listener in self._update_listeners:
-            listener()
+        self.notify_listeners()
 
     def _compute_next_mow_estimate(self) -> None:
         if self.state.mow_needed and self.state.mow_allowed:
@@ -673,9 +678,15 @@ class SmartMowingCoordinator:
     async def async_start_mowing(self) -> None:
         if not self.mower_entity_id:
             return
-        await self.hass.services.async_call(
-            "lawn_mower", "start_mowing", {"entity_id": self.mower_entity_id}, blocking=True
-        )
+        try:
+            await self.hass.services.async_call(
+                "lawn_mower", "start_mowing", {"entity_id": self.mower_entity_id}, blocking=True
+            )
+        except HomeAssistantError as err:
+            _LOGGER.warning(
+                "%s: could not start mowing on %s: %s", self.device_name, self.mower_entity_id, err
+            )
+            return
         self.state.mower_started_by_us = True
         self.state.last_mow_time = dt_util.utcnow()
         self.hass.bus.async_fire(EVENT_MOWING_STARTED, {"config_entry_id": self.entry.entry_id})
@@ -683,9 +694,19 @@ class SmartMowingCoordinator:
     async def _async_dock(self, reason: str) -> None:
         if not self.mower_entity_id:
             return
-        await self.hass.services.async_call(
-            "lawn_mower", "dock", {"entity_id": self.mower_entity_id}, blocking=True
-        )
+        try:
+            await self.hass.services.async_call(
+                "lawn_mower", "dock", {"entity_id": self.mower_entity_id}, blocking=True
+            )
+        except HomeAssistantError as err:
+            _LOGGER.warning(
+                "%s: could not dock %s after '%s': %s",
+                self.device_name,
+                self.mower_entity_id,
+                reason,
+                err,
+            )
+            return
         self.state.mower_started_by_us = False
         self.hass.bus.async_fire(
             EVENT_MOWING_ABORTED, {"config_entry_id": self.entry.entry_id, "reason": reason}
