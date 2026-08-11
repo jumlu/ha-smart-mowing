@@ -60,9 +60,10 @@ async def test_setup_creates_all_entities(hass):
         state = hass.states.get(by_unique_id[unique_id])
         assert state is not None
         assert state.state != "unavailable"
-        # next_mow legitimately starts as "unknown": no forecast is possible
-        # before the first temperature sample has been taken.
-        if suffix != "_next_mow":
+        # next_mow has no forecast yet (no temperature sample taken), and
+        # last_mow is unknown until the first mow completes - both legitimately
+        # start out unset.
+        if suffix not in ("_next_mow", "_last_mow"):
             assert state.state != "unknown"
 
 
