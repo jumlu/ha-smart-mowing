@@ -77,16 +77,24 @@ WEEKDAY_OPTIONS = [
 ]
 
 
+def _suggest(defaults: dict[str, Any], key: str) -> dict[str, Any]:
+    """Build a `description` kwarg that pre-fills a field without forcing
+    voluptuous to validate a default value when the field is left empty."""
+    if key not in defaults or defaults[key] is None:
+        return {}
+    return {"description": {"suggested_value": defaults[key]}}
+
+
 def _step_user_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     defaults = defaults or {}
     return vol.Schema(
         {
-            vol.Required(CONF_NAME, default=defaults.get(CONF_NAME)): selector.TextSelector(),
+            vol.Required(CONF_NAME, **_suggest(defaults, CONF_NAME)): selector.TextSelector(),
             vol.Required(
-                CONF_MOWER_ENTITY, default=defaults.get(CONF_MOWER_ENTITY)
+                CONF_MOWER_ENTITY, **_suggest(defaults, CONF_MOWER_ENTITY)
             ): selector.EntitySelector(selector.EntitySelectorConfig(domain="lawn_mower")),
             vol.Required(
-                CONF_TEMPERATURE_ENTITY, default=defaults.get(CONF_TEMPERATURE_ENTITY)
+                CONF_TEMPERATURE_ENTITY, **_suggest(defaults, CONF_TEMPERATURE_ENTITY)
             ): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
             ),
@@ -99,24 +107,24 @@ def _step_weather_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     return vol.Schema(
         {
             vol.Optional(
-                CONF_RAIN_RATE_ENTITY, default=defaults.get(CONF_RAIN_RATE_ENTITY)
+                CONF_RAIN_RATE_ENTITY, **_suggest(defaults, CONF_RAIN_RATE_ENTITY)
             ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
             vol.Optional(
-                CONF_RAIN_AMOUNT_ENTITY, default=defaults.get(CONF_RAIN_AMOUNT_ENTITY)
+                CONF_RAIN_AMOUNT_ENTITY, **_suggest(defaults, CONF_RAIN_AMOUNT_ENTITY)
             ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
             vol.Optional(
-                CONF_HUMIDITY_ENTITY, default=defaults.get(CONF_HUMIDITY_ENTITY)
+                CONF_HUMIDITY_ENTITY, **_suggest(defaults, CONF_HUMIDITY_ENTITY)
             ): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", device_class="humidity")
             ),
             vol.Optional(
-                CONF_DEWPOINT_ENTITY, default=defaults.get(CONF_DEWPOINT_ENTITY)
+                CONF_DEWPOINT_ENTITY, **_suggest(defaults, CONF_DEWPOINT_ENTITY)
             ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
             vol.Optional(
-                CONF_SOIL_MOISTURE_ENTITY, default=defaults.get(CONF_SOIL_MOISTURE_ENTITY)
+                CONF_SOIL_MOISTURE_ENTITY, **_suggest(defaults, CONF_SOIL_MOISTURE_ENTITY)
             ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
             vol.Optional(
-                CONF_SOLAR_RADIATION_ENTITY, default=defaults.get(CONF_SOLAR_RADIATION_ENTITY)
+                CONF_SOLAR_RADIATION_ENTITY, **_suggest(defaults, CONF_SOLAR_RADIATION_ENTITY)
             ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
         }
     )
@@ -127,7 +135,7 @@ def _step_irrigation_schema(defaults: dict[str, Any] | None = None) -> vol.Schem
     return vol.Schema(
         {
             vol.Optional(
-                CONF_IRRIGATION_ENTITIES, default=defaults.get(CONF_IRRIGATION_ENTITIES)
+                CONF_IRRIGATION_ENTITIES, **_suggest(defaults, CONF_IRRIGATION_ENTITIES)
             ): selector.EntitySelector(
                 selector.EntitySelectorConfig(
                     domain=["switch", "binary_sensor", "valve"], multiple=True
