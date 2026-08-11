@@ -9,6 +9,10 @@
           "name": "Name",
           "mower_entity": "Mower",
           "temperature_entity": "Temperature sensor"
+        },
+        "data_description": {
+          "mower_entity": "The lawn_mower entity this instance controls: started, docked, and watched for its current state.",
+          "temperature_entity": "Drives the Growth Potential model and the heat lockout. Required - growth can't be estimated without it."
         }
       },
       "weather": {
@@ -21,6 +25,14 @@
           "dewpoint_entity": "Dew point sensor",
           "soil_moisture_entity": "Soil moisture sensor (%)",
           "solar_radiation_entity": "Solar radiation sensor (W/m²)"
+        },
+        "data_description": {
+          "rain_rate_entity": "Detects rain as it's happening: blocks mowing above the rain-stop threshold and docks a mow already in progress. Without it, active rain isn't detected at all - only past rain, if rain_amount_entity is set.",
+          "rain_amount_entity": "Tracks recent rainfall. Used to keep mowing blocked for a while after rain stops (grass still wet), and - only if no soil-moisture sensor is set - to dampen growth after a run of dry days. Without it, neither applies.",
+          "humidity_entity": "Currently collected for diagnostics only; not factored into any mowing or growth decision yet.",
+          "dewpoint_entity": "Combined with the temperature sensor to detect dew (mowing pauses when the two are close together). Without it, morning dew on the grass isn't detected.",
+          "soil_moisture_entity": "Dampens growth proportionally as the soil dries out, and blocks mowing outright below the drought threshold (options). Without it, drought protection falls back to the coarser rain-amount-based rule, or is off entirely if that's not set either.",
+          "solar_radiation_entity": "Dampens growth on overcast days. Without it, growth is calculated as if it were always full sun."
         }
       },
       "irrigation": {
@@ -28,6 +40,10 @@
         "data": {
           "irrigation_entities": "Irrigation entities",
           "irrigation_lockout_hours": "Lockout after irrigation ends (h)"
+        },
+        "data_description": {
+          "irrigation_entities": "Any switch/binary_sensor/valve that's on while a zone is watering. Blocks mowing during and shortly after irrigation. Without one, irrigation isn't taken into account at all.",
+          "irrigation_lockout_hours": "How long mowing stays blocked after the last irrigation entity turns off."
         }
       }
     },

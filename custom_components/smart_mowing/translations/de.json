@@ -9,6 +9,10 @@
           "name": "Name",
           "mower_entity": "Mäher",
           "temperature_entity": "Temperatursensor"
+        },
+        "data_description": {
+          "mower_entity": "Die lawn_mower-Entity, die diese Instanz steuert: wird gestartet, angedockt und auf ihren aktuellen Zustand beobachtet.",
+          "temperature_entity": "Treibt das Growth-Potential-Modell und die Hitze-Sperre an. Pflichtfeld - ohne Temperatur lässt sich kein Wachstum schätzen."
         }
       },
       "weather": {
@@ -21,6 +25,14 @@
           "dewpoint_entity": "Taupunkt-Sensor",
           "soil_moisture_entity": "Bodenfeuchte-Sensor (%)",
           "solar_radiation_entity": "Solarstrahlungs-Sensor (W/m²)"
+        },
+        "data_description": {
+          "rain_rate_entity": "Erkennt Regen, während er fällt: sperrt das Mähen oberhalb der Regen-Stop-Schwelle und dockt einen laufenden Mähvorgang ab. Ohne ihn wird aktueller Regen gar nicht erkannt - nur vergangener, falls ein Regenmengen-Sensor gesetzt ist.",
+          "rain_amount_entity": "Verfolgt kürzlich gefallenen Regen. Hält das Mähen nach Regenende noch eine Weile gesperrt (Gras noch nass), und dämpft - nur falls kein Bodenfeuchte-Sensor gesetzt ist - das Wachstum nach mehreren trockenen Tagen. Ohne ihn entfällt beides.",
+          "humidity_entity": "Wird aktuell nur für Diagnosezwecke erfasst; fließt noch in keine Mäh- oder Wachstumsentscheidung ein.",
+          "dewpoint_entity": "Wird zusammen mit dem Temperatursensor zur Tau-Erkennung genutzt (Mähen pausiert, wenn beide nah beieinanderliegen). Ohne ihn wird morgendlicher Tau auf dem Rasen nicht erkannt.",
+          "soil_moisture_entity": "Dämpft das Wachstum proportional zur Bodentrockenheit und sperrt das Mähen unterhalb der Trockenheits-Schwelle (Einstellungen) komplett. Ohne ihn greift ersatzweise die gröbere, regenmengen-basierte Regel - oder gar keine, falls auch kein Regenmengen-Sensor gesetzt ist.",
+          "solar_radiation_entity": "Dämpft das Wachstum an bewölkten Tagen. Ohne ihn wird Wachstum berechnet, als wäre immer volle Sonne."
         }
       },
       "irrigation": {
@@ -28,6 +40,10 @@
         "data": {
           "irrigation_entities": "Bewässerungs-Entities",
           "irrigation_lockout_hours": "Sperrdauer nach Bewässerungsende (h)"
+        },
+        "data_description": {
+          "irrigation_entities": "Jede switch-/binary_sensor-/valve-Entity, die an ist, während eine Zone bewässert wird. Sperrt das Mähen während und kurz nach der Bewässerung. Ohne eine solche Entity wird Bewässerung gar nicht berücksichtigt.",
+          "irrigation_lockout_hours": "Wie lange das Mähen gesperrt bleibt, nachdem die letzte Bewässerungs-Entity ausgeschaltet hat."
         }
       }
     },
