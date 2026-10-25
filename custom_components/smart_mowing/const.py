@@ -93,6 +93,27 @@ DAILY_ROLLOVER_SECOND = 0
 # --- Need percentage cap ---
 NEED_PERCENT_CAP = 200.0
 
+# --- Mow detection ---
+# How long the mower may take to actually report "mowing" after we sent
+# start_mowing before the attempt is written off. Navimow has been observed
+# to need ~25 minutes between the command and leaving the dock.
+MOW_START_TIMEOUT_MINUTES = 30
+# Wait this long after a timed-out start before sending start_mowing again.
+MOW_START_RETRY_BACKOFF_MINUTES = 60
+# After this many consecutive timed-out starts, stop retrying until the next
+# daily rollover (or until the mower is seen mowing again).
+MOW_START_MAX_ATTEMPTS = 3
+# A return to "mowing" within this window after leaving it is treated as the
+# same session (state flap), not as a new mow.
+MOW_FLAP_DEBOUNCE_SECONDS = 300
+
+# --- Forecast: smoothing factor for the exponential moving average of daily growth ---
+GROWTH_RATE_EMA_ALPHA = 0.3
+
+# --- Persistent storage ---
+STORAGE_VERSION = 1
+STORAGE_SAVE_DELAY_SECONDS = 10
+
 # --- Blocker keys ---
 BLOCKER_OUTSIDE_WINDOW = "outside_window"
 BLOCKER_RAINING = "raining"

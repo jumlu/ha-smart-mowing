@@ -42,7 +42,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add custom_components/smart_mowing/manifest.json
-          git commit -m "chore: release v${{ inputs.version }}"
+          # the version may already be bumped in the PR that carries the changelog
+          git diff --cached --quiet || git commit -m "chore: release v${{ inputs.version }}"
           git tag "v${{ inputs.version }}"
           git push origin HEAD:main
           git push origin "v${{ inputs.version }}"

@@ -44,6 +44,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: SmartMowingConfigEntry) 
     """Set up Smart Mowing from a config entry."""
     coordinator = SmartMowingCoordinator(hass, entry)
     entry.runtime_data = coordinator
+    # load persisted growth/baseline before the entities write their first state
+    await coordinator.async_load()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await coordinator.async_setup()

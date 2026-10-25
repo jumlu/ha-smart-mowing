@@ -81,11 +81,34 @@ growth_mm = GP × max_growth_rate × water_factor × light_factor
   `solar_radiation / reference`, clamped to `[0.3, 1]` — diffuse light still allows some growth,
   so it floors rather than zeroes out.
 
-The result accumulates into `growth_index` (mm) at midnight. Once it reaches the configured
-threshold (default 4 mm — the classic one-third rule is too coarse for a mulching mower that
-should take small amounts often), the lawn is considered ready to mow. The accumulator resets to 0
-only after a *successful* mow — a mow aborted by rain leaves the accumulated progress untouched,
-since the grass didn't stop growing just because the mower got interrupted.
+The result accumulates into `growth_index` (mm) at midnight. `growth_index` is a cumulative
+total; the mow need is measured against a **baseline** — the `growth_index` value at the start of
+the last mow:
+
+```
+mow_need = (growth_index − growth_index_at_last_mow) / growth_threshold_mm × 100   (capped at 200%)
+```
+
+Once the growth since the last mow reaches the configured threshold (default 4 mm — the classic
+one-third rule is too coarse for a mulching mower that should take small amounts often), the lawn
+is considered ready to mow. The baseline and `last_mow` are persisted (HA storage), so they
+survive restarts and reloads.
+
+### What counts as a mow
+
+- A mow is counted when the mower entity **actually switches to `mowing`** — never when
+  `start_mowing` is sent. If the mower doesn't report `mowing` within 30 minutes of the command,
+  the attempt is not counted, a warning is logged, and Smart Mowing retries after 60 minutes;
+  after 3 failed attempts it waits until the next day.
+- **Every** run counts, including runs started from the vendor app, the mower's own schedule or
+  by hand — independent of "Only dock runs started by Smart Mowing". The grass was cut either way,
+  so the need must start over; otherwise Smart Mowing would immediately send the mower out again.
+  (That option only governs whether a rain abort may dock a run.)
+- Short flaps (`mowing → docked → mowing` within 5 minutes) and resuming from `paused` count as the
+  same run.
+- The baseline is set when the run starts. A run that gets rained out still counts — the mower
+  has covered part of the lawn, and the minimum interval plus the need restart keep it from being
+  sent straight out again.
 
 Because the temperature response is a bell curve, growth collapses on its own during a hot spell —
 no separate correction needed. The heat lockout below still exists, but purely to protect the
@@ -95,25 +118,28 @@ mower hardware from operating in extreme heat, independent of the growth model.
 
 | Entity | Type | Description |
 |---|---|---|
-| `sensor.<name>_growth_index` | Sensor (`total`, restores across restarts) | Accumulated growth in mm since the last successful mow |
-| `sensor.<name>_mow_need` | Sensor (%) | `growth_index / threshold × 100`, capped at 200% |
+| `sensor.<name>_growth_index` | Sensor (`total`, restores across restarts) | Cumulative modeled growth in mm |
+| `sensor.<name>_mow_need` | Sensor (%) | `(growth_index − baseline) / threshold × 100`, capped at 200% |
 | `binary_sensor.<name>_mowing_allowed` | Binary sensor | AND of all lockouts; `blockers` attribute lists active reasons |
 | `binary_sensor.<name>_grass_wet` | Binary sensor (`moisture`) | Standalone wetness assessment (rain/dew/recent rain) |
 | `switch.<name>_automatic` | Switch (restores across restarts) | Master switch — off disables all automatic action |
-| `sensor.<name>_last_mow` | Sensor (`timestamp`) | When the last mow (started by this integration) completed |
-| `sensor.<name>_next_mow` | Sensor (`timestamp`) | Forecast of when need and permission will next coincide |
+| `sensor.<name>_last_mow` | Sensor (`timestamp`) | When the mower last actually started mowing (any trigger) |
+| `sensor.<name>_next_mow` | Sensor (`timestamp`) | Forecast of the next mow (see FAQ) |
 
 All entities of a config entry are grouped under one device.
 
 ## Services
 
 - `smart_mowing.force_mow` — start mowing now, bypassing all lockouts.
-- `smart_mowing.reset_growth` — set the growth index back to 0 (e.g. after a manual mow).
-- `smart_mowing.set_growth` — set the growth index to a specific value (calibration).
+- `smart_mowing.reset_growth` — set the growth index and the mow need back to 0. Not needed after a
+  manual mow any more — those are detected automatically.
+- `smart_mowing.set_growth` — set the growth since the last mow to a specific value (calibration;
+  the index restarts at that value with a baseline of 0).
 
 ## Events
 
-- `smart_mowing_started`, `smart_mowing_aborted` (with `reason`), `smart_mowing_completed`.
+- `smart_mowing_started` (fired once the mower confirms `mowing` on a run Smart Mowing started),
+  `smart_mowing_aborted` (with `reason`), `smart_mowing_completed`.
 
 ## Reconfiguration and removal
 
@@ -138,9 +164,11 @@ integration, ...). That's the first thing to check before filing an issue.
   `binary_sensor.<name>_mowing_allowed`'s `blockers` attribute for the active lockout(s).
 - **A required sensor shows `unavailable_source` in blockers:** the mower or temperature entity is
   `unknown`/`unavailable` — the integration refuses to decide without them rather than guessing.
-- **Growth index looks wrong after a restart:** it's restored via each entity's last recorded
-  state; if the growth index sensor was unavailable for a long time before restart (e.g. the
-  integration was reloaded mid-day), the restored value only reflects whatever was last written.
+- **Growth index looks wrong after a restart:** growth index, baseline and last mow are kept in HA
+  storage (`.storage/smart_mowing.<entry_id>`). After upgrading from a version before 0.4.0 the
+  baseline is unknown, so the need starts at 0 from the current growth index.
+- **A start never shows up as `last_mow`:** check the log for "did not report mowing" — the mower
+  accepted `start_mowing` but never switched to `mowing`.
 - **The mower keeps getting docked:** check for `smart_mowing_aborted` events and their `reason` —
   usually `raining`. If it's docking mows you started manually, verify "Only dock runs started by
   Smart Mowing" is enabled in the options.
@@ -160,12 +188,12 @@ setup dialog, prefilled with your current values — change the temperature sens
 add/change the rain rate sensor and any other weather sensor in step 2. The entry, its entities,
 and their history stay intact; nothing needs to be deleted and recreated.
 
-**Why does `sensor.<name>_next_mow` (the forecast) change so often?** It's recomputed as "now +
-estimated days remaining" on every evaluation, and evaluation runs on every state change of any
-watched entity plus a periodic timer — so the timestamp keeps shifting forward even when nothing
-meaningful changed. The days-remaining estimate itself also moves as today's running temperature
-average updates, especially early in the day when only a few samples exist. This is expected: it's
-a live re-estimate, not a fixed appointment.
+**How is `sensor.<name>_next_mow` (the forecast) computed?** Below 100% need: "now + remaining mm /
+expected growth per day", where the expected rate is a moving average of the recent daily growth
+(falling back to today's temperatures right after setup). At or above 100%: "now" if mowing is
+allowed, otherwise the next moment the minimum interval / grace period has passed and the mow
+window is open. Weather lockouts can't be predicted and are ignored. It's recomputed on every
+evaluation, so the timestamp shifts a little over time — a live re-estimate, not an appointment.
 
 **Why didn't it mow even though `mow_need` is over 100%?** Check
 `binary_sensor.<name>_mowing_allowed`'s `blockers` attribute — it lists every active lockout
@@ -180,8 +208,9 @@ flicker doesn't immediately clear the irrigation lockout.
 **Will it dock a mow I started manually?** No, by default the integration only docks mows it
 started itself (configurable via "Only dock runs started by Smart Mowing" in the options).
 
-**What happens to progress if a mow gets rained out?** Nothing — the growth accumulator is only
-reset after a mow that actually completed, so an aborted run doesn't cost you accumulated growth.
+**What happens to progress if a mow gets rained out?** The run still counts as a mow (the need
+restarts from the moment the mower actually started mowing), since part of the lawn was cut. If you
+want an immediate retry, use `smart_mowing.force_mow` or `smart_mowing.set_growth`.
 
 ## Development
 

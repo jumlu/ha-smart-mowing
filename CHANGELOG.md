@@ -1,0 +1,33 @@
+# Changelog
+
+## 0.4.0 — 2026-10-25
+
+### Fixed
+
+- **`mow_need` stuck at 200%.** The need was computed from the cumulative `growth_index`
+  without subtracting the growth at the last mow, so it never dropped after mowing and the mower
+  went out on every release (only `min_mow_interval_hours` held it back). The need is now
+  `(growth_index − growth_index_at_last_mow) / growth_threshold_mm × 100`.
+- **Baseline survives restarts.** Growth index, baseline, last mow and the growth-rate estimate
+  are persisted in HA storage and loaded before the entities are created — no more `0 → 200%`
+  flicker on restart/reload. Upgrading from an older version starts the need at 0 from the
+  current growth index.
+- **`last_mow` only on a confirmed mow.** `last_mow` and the baseline are set when the mower
+  entity actually switches to `mowing`, not when `start_mowing` is sent. A start that isn't
+  confirmed within 30 minutes is not counted, logs a warning and is retried after 60 minutes
+  (max. 3 attempts per day).
+- **Flap debouncing.** `mowing → docked → mowing` within 5 minutes and `paused → mowing` count as
+  one run.
+- **`next_mow` forecast no longer `unknown`.** Below 100% it is derived from the remaining growth
+  and a moving average of the daily growth; at or above 100% it is "now" or the next moment the
+  mow window/cooldown allows.
+
+### Changed
+
+- Runs started outside Smart Mowing (vendor app, mower schedule, by hand) now reset the need as
+  well, independent of "Only dock runs started by Smart Mowing" — the grass was cut either way.
+- `smart_mowing_started` fires when the mower confirms `mowing` on a run Smart Mowing started,
+  not when the command is sent.
+- `reset_growth` / `set_growth` now set the growth *since the last mow* (index restarts at the
+  value, baseline at 0).
+- Diagnostics include baseline, growth since mow, rate estimate and start-retry state.

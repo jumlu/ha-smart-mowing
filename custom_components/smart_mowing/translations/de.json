@@ -126,14 +126,14 @@
     },
     "reset_growth": {
       "name": "Wachstumsindex zurücksetzen",
-      "description": "Setzt den Wachstumsindex auf 0, z. B. nach manuellem Mähen.",
+      "description": "Setzt Wachstumsindex und Mähbedarf auf 0. Manuelle Mähfahrten werden automatisch erkannt.",
       "fields": {
         "entity_id": { "name": "Entity", "description": "Eine beliebige Smart-Mowing-Entity der Ziel-Rasenfläche." }
       }
     },
     "set_growth": {
       "name": "Wachstumsindex setzen",
-      "description": "Kalibriert den Wachstumsindex auf einen bestimmten Wert.",
+      "description": "Kalibriert das Wachstum seit dem letzten Mähen auf einen bestimmten Wert.",
       "fields": {
         "entity_id": { "name": "Entity", "description": "Eine beliebige Smart-Mowing-Entity der Ziel-Rasenfläche." },
         "value": { "name": "Wert", "description": "Neuer Wachstumsindex-Wert (mm)." }

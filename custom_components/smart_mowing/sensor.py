@@ -51,7 +51,7 @@ class _BaseSensor(SensorEntity):
 
 
 class GrowthIndexSensor(_BaseSensor, RestoreEntity):
-    """Accumulated lawn growth, in mm, since the last mow."""
+    """Cumulative lawn growth in mm (mow need is measured against a baseline)."""
 
     _attr_translation_key = "growth_index"
     _attr_state_class = SensorStateClass.TOTAL
@@ -87,11 +87,11 @@ class MowNeedSensor(_BaseSensor):
 
     @property
     def native_value(self) -> float:
-        return round(self.coordinator.state.need_percent, 1)
+        return round(self.coordinator.need_percent, 1)
 
 
 class LastMowSensor(_BaseSensor, RestoreEntity):
-    """Timestamp of the last completed mow started by this integration."""
+    """Timestamp the mower last actually started mowing (any trigger)."""
 
     _attr_translation_key = "last_mow"
     _attr_device_class = SensorDeviceClass.TIMESTAMP

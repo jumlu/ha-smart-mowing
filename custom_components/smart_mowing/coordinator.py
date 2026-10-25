@@ -4,6 +4,13 @@ No DataUpdateCoordinator / polling is used. Re-evaluation is driven by
 state-change events on the configured source entities plus a periodic
 timer (temperature sampling, blocker re-evaluation) and a daily rollover
 timer (growth accumulation).
+
+growth_index is a cumulative total. Mow need is measured against
+growth_baseline, the growth_index value at the start of the last confirmed
+mow. A mow only counts once the mower entity actually reports "mowing" -
+never on sending start_mowing - and it counts no matter who started it
+(Smart Mowing, the vendor app, or the mower's own schedule): the grass was
+cut either way, so the need has to start over.
 """
 
 from __future__ import annotations
@@ -20,10 +27,12 @@ from homeassistant.core import Event, EventStateChangedData, HomeAssistant, Stat
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.event import (
+    async_call_later,
     async_track_state_change_event,
     async_track_time_change,
     async_track_time_interval,
 )
+from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -98,11 +107,19 @@ from .const import (
     EVENT_MOWING_ABORTED,
     EVENT_MOWING_COMPLETED,
     EVENT_MOWING_STARTED,
+    GROWTH_RATE_EMA_ALPHA,
     LIGHT_FACTOR_MIN,
+    MOW_FLAP_DEBOUNCE_SECONDS,
+    MOW_START_MAX_ATTEMPTS,
+    MOW_START_RETRY_BACKOFF_MINUTES,
+    MOW_START_TIMEOUT_MINUTES,
     NEED_PERCENT_CAP,
     NO_SOIL_SENSOR_DROUGHT_FACTOR,
     STATE_DOCKED,
     STATE_MOWING,
+    STATE_PAUSED,
+    STORAGE_SAVE_DELAY_SECONDS,
+    STORAGE_VERSION,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -205,6 +222,13 @@ def above_with_hysteresis(
     return value > threshold
 
 
+def compute_need_percent(growth_since_mow: float, threshold_mm: float) -> float:
+    """Mow need in percent of the threshold, capped at NEED_PERCENT_CAP."""
+    if threshold_mm <= 0:
+        return 0.0
+    return clamp(growth_since_mow / threshold_mm * 100.0, 0.0, NEED_PERCENT_CAP)
+
+
 def _is_valid_state(state: State | None) -> TypeGuard[State]:
     return state is not None and state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE)
 
@@ -223,9 +247,13 @@ def _float_state(hass: HomeAssistant, entity_id: str | None) -> float | None:
 
 @dataclass
 class SmartMowingRuntimeState:
-    """Mutable runtime state, seeded by RestoreEntity-backed entities."""
+    """Mutable runtime state, seeded from the Store (and RestoreEntity for migration)."""
 
     growth_index: float = 0.0
+    # growth_index at the start of the last confirmed mow; None until known
+    growth_baseline: float | None = None
+    # exponential moving average of the daily growth in mm, for the forecast
+    growth_rate_estimate: float | None = None
     daily_temp_sum: float = 0.0
     daily_temp_count: int = 0
     last_rollover_date: date | None = None
@@ -233,6 +261,14 @@ class SmartMowingRuntimeState:
     next_mow_time: datetime | None = None
     automatic_enabled: bool = True
     mower_started_by_us: bool = False
+    # start_mowing was sent, but the mower has not reported "mowing" yet
+    pending_start_since: datetime | None = None
+    start_failures: int = 0
+    start_retry_after: datetime | None = None
+    # when the mower last left "mowing" (flap debounce) and whether that
+    # session was ours
+    last_seen_mowing: datetime | None = None
+    last_session_own: bool = False
     irrigation_last_seen_on: datetime | None = None
     rain_history: deque = field(default_factory=lambda: deque(maxlen=2000))
     last_rain_time: datetime | None = None
@@ -255,6 +291,11 @@ class SmartMowingCoordinator:
         self.state = SmartMowingRuntimeState()
         self._unsub_listeners: list[Any] = []
         self._update_listeners: list[Any] = []
+        self._unsub_start_timeout: Any = None
+        self._store: Store[dict[str, Any]] = Store(
+            hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}"
+        )
+        self._loaded_from_store = False
         self.device_name: str = entry.data.get(CONF_NAME, entry.title)
 
     @property
@@ -419,7 +460,41 @@ class SmartMowingCoordinator:
         for listener in self._update_listeners:
             listener()
 
+    async def async_load(self) -> None:
+        """Load persisted state. Must run before the entity platforms are set up."""
+        data = await self._store.async_load()
+        if not data:
+            return
+        self._loaded_from_store = True
+        self.state.growth_index = float(data.get("growth_index", 0.0))
+        baseline = data.get("growth_baseline")
+        self.state.growth_baseline = float(baseline) if baseline is not None else None
+        rate = data.get("growth_rate_estimate")
+        self.state.growth_rate_estimate = float(rate) if rate is not None else None
+        last_mow = data.get("last_mow_time")
+        self.state.last_mow_time = dt_util.parse_datetime(last_mow) if last_mow else None
+        self.state.need_percent = self.need_percent
+
+    def _data_to_save(self) -> dict[str, Any]:
+        return {
+            "growth_index": self.state.growth_index,
+            "growth_baseline": self.state.growth_baseline,
+            "growth_rate_estimate": self.state.growth_rate_estimate,
+            "last_mow_time": self.state.last_mow_time.isoformat()
+            if self.state.last_mow_time
+            else None,
+        }
+
+    def _schedule_save(self) -> None:
+        self._store.async_delay_save(self._data_to_save, STORAGE_SAVE_DELAY_SECONDS)
+
     async def async_setup(self) -> None:
+        if self.state.growth_baseline is None:
+            # First start (or upgrade from a version without a baseline): we
+            # don't know the growth at the last mow, so start counting from now
+            # instead of treating the whole cumulative index as uncut growth.
+            self.state.growth_baseline = self.state.growth_index
+            self._schedule_save()
         entities_to_watch = [
             eid
             for eid in (
@@ -459,10 +534,18 @@ class SmartMowingCoordinator:
         for unsub in self._unsub_listeners:
             unsub()
         self._unsub_listeners.clear()
+        self._cancel_start_timeout()
+        # flush now: a reload creates a new Store instance that would
+        # otherwise read the file before the delayed save has landed
+        await self._store.async_save(self._data_to_save())
 
     # --------------------------------------------------------------- events
     @callback
     def _async_on_state_change(self, event: Event[EventStateChangedData]) -> None:
+        if event.data["entity_id"] == self.mower_entity_id:
+            self._handle_mower_transition(
+                event.data["old_state"], event.data["new_state"], dt_util.utcnow()
+            )
         self.hass.async_create_task(self._async_evaluate())
 
     @callback
@@ -473,7 +556,96 @@ class SmartMowingCoordinator:
 
     async def _async_on_daily_rollover(self, now: datetime) -> None:
         self._roll_over_day()
+        # a new day gives a mower that refused to start a fresh set of attempts
+        self.state.start_failures = 0
+        self.state.start_retry_after = None
         await self._async_evaluate()
+
+    # -------------------------------------------------------- mow detection
+    def _handle_mower_transition(
+        self, old_state: State | None, new_state: State | None, now: datetime
+    ) -> None:
+        """Count a mow when the mower actually enters "mowing"."""
+        old = old_state.state if old_state is not None else None
+        new = new_state.state if new_state is not None else None
+        if old == STATE_MOWING and new != STATE_MOWING:
+            self.state.last_seen_mowing = now
+            return
+        if new != STATE_MOWING or old == STATE_MOWING:
+            return
+
+        own = self.state.pending_start_since is not None
+        self.state.pending_start_since = None
+        self.state.start_failures = 0
+        self.state.start_retry_after = None
+        self._cancel_start_timeout()
+
+        last_seen = self.state.last_seen_mowing
+        is_flap = last_seen is not None and (now - last_seen) <= timedelta(
+            seconds=MOW_FLAP_DEBOUNCE_SECONDS
+        )
+        if old == STATE_PAUSED or is_flap:
+            # resumed or flapped back into the same session - already counted
+            self.state.mower_started_by_us = (
+                self.state.mower_started_by_us or self.state.last_session_own or own
+            )
+            _LOGGER.debug("%s: mower back to mowing (%s), same session", self.device_name, old)
+            return
+
+        self._register_mow(now, own)
+
+    def _register_mow(self, now: datetime, own: bool) -> None:
+        self.state.growth_baseline = self.state.growth_index
+        self.state.last_mow_time = now
+        self.state.mower_started_by_us = own
+        self.state.last_session_own = own
+        self._schedule_save()
+        _LOGGER.info(
+            "%s: mow started (%s), need reset at growth_index=%.2f",
+            self.device_name,
+            "by Smart Mowing" if own else "externally",
+            self.state.growth_index,
+        )
+        if own:
+            self.hass.bus.async_fire(EVENT_MOWING_STARTED, {"config_entry_id": self.entry.entry_id})
+
+    def _cancel_start_timeout(self) -> None:
+        if self._unsub_start_timeout is not None:
+            self._unsub_start_timeout()
+            self._unsub_start_timeout = None
+
+    @callback
+    def _async_on_start_timeout(self, _now: datetime) -> None:
+        self._unsub_start_timeout = None
+        if self.state.pending_start_since is None:
+            return
+        now = dt_util.utcnow()
+        self.state.pending_start_since = None
+        self.state.start_failures += 1
+        if self.state.start_failures >= MOW_START_MAX_ATTEMPTS:
+            self.state.start_retry_after = dt_util.as_utc(
+                dt_util.start_of_local_day(dt_util.now() + timedelta(days=1))
+            )
+            _LOGGER.error(
+                "%s: %s did not start mowing after %d attempts; not retrying before %s",
+                self.device_name,
+                self.mower_entity_id,
+                self.state.start_failures,
+                self.state.start_retry_after.isoformat(),
+            )
+        else:
+            self.state.start_retry_after = now + timedelta(minutes=MOW_START_RETRY_BACKOFF_MINUTES)
+            _LOGGER.warning(
+                "%s: %s did not report mowing within %d minutes of start_mowing "
+                "(attempt %d/%d); not counted as a mow, retrying after %s",
+                self.device_name,
+                self.mower_entity_id,
+                MOW_START_TIMEOUT_MINUTES,
+                self.state.start_failures,
+                MOW_START_MAX_ATTEMPTS,
+                self.state.start_retry_after.isoformat(),
+            )
+        self.hass.async_create_task(self._async_evaluate())
 
     # ---------------------------------------------------------- temperature
     def _sample_temperature(self) -> None:
@@ -551,6 +723,13 @@ class SmartMowingCoordinator:
             light_factor,
         )
         self.state.growth_index += daily_growth
+        previous_rate = self.state.growth_rate_estimate
+        self.state.growth_rate_estimate = (
+            daily_growth
+            if previous_rate is None
+            else GROWTH_RATE_EMA_ALPHA * daily_growth + (1 - GROWTH_RATE_EMA_ALPHA) * previous_rate
+        )
+        self._schedule_save()
         self.state.daily_temp_sum = 0.0
         self.state.daily_temp_count = 0
         self.state.last_rollover_date = dt_util.now().date()
@@ -565,10 +744,16 @@ class SmartMowingCoordinator:
         )
 
     # ------------------------------------------------------------- restore
+    # The Store is authoritative; entity restore only seeds values when
+    # upgrading from a version that kept them in entity state alone.
     def restore_growth_index(self, value: float) -> None:
+        if self._loaded_from_store:
+            return
         self.state.growth_index = value
 
     def restore_last_mow_time(self, value: datetime | None) -> None:
+        if self._loaded_from_store:
+            return
         self.state.last_mow_time = value
 
     def restore_automatic_enabled(self, value: bool) -> None:
@@ -576,10 +761,26 @@ class SmartMowingCoordinator:
 
     # ------------------------------------------------------------- actions
     def reset_growth(self) -> None:
-        self.state.growth_index = 0.0
+        self.set_growth(0.0)
 
     def set_growth(self, value: float) -> None:
+        """Set the growth since the last mow (index restarts at value, baseline at 0)."""
         self.state.growth_index = value
+        self.state.growth_baseline = 0.0
+        self.state.need_percent = self.need_percent
+        self._schedule_save()
+
+    # ---------------------------------------------------------------- need
+    @property
+    def growth_since_mow(self) -> float:
+        baseline = self.state.growth_baseline
+        if baseline is None:
+            return 0.0
+        return max(0.0, self.state.growth_index - baseline)
+
+    @property
+    def need_percent(self) -> float:
+        return compute_need_percent(self.growth_since_mow, self.growth_threshold_mm)
 
     async def async_set_automatic_enabled(self, enabled: bool) -> None:
         self.state.automatic_enabled = enabled
@@ -710,45 +911,75 @@ class SmartMowingCoordinator:
             or BLOCKER_RECENT_RAIN in raw_blockers
         )
         self.state.mow_allowed = not blockers
-        self.state.mow_needed = self.state.growth_index >= self.growth_threshold_mm
-        self.state.need_percent = min(
-            NEED_PERCENT_CAP,
-            (self.state.growth_index / self.growth_threshold_mm * 100.0)
-            if self.growth_threshold_mm
-            else 0.0,
-        )
-        self._compute_next_mow_estimate()
+        self.state.need_percent = self.need_percent
+        self.state.mow_needed = self.state.need_percent >= 100.0
+        self._compute_next_mow_estimate(now)
 
         await self._async_maybe_act(raw_blockers, now)
 
         self.notify_listeners()
 
-    def _compute_next_mow_estimate(self) -> None:
+    def _compute_next_mow_estimate(self, now: datetime) -> None:
         if self.state.mow_needed and self.state.mow_allowed:
-            self.state.next_mow_time = dt_util.utcnow()
+            self.state.next_mow_time = now
             return
-        if self.state.mow_needed:
-            # need is met, waiting on a blocker to clear - unknown ETA
-            self.state.next_mow_time = None
-            return
-        remaining = self.growth_threshold_mm - self.state.growth_index
-        if remaining <= 0 or self.state.daily_temp_count == 0:
-            self.state.next_mow_time = None
-            return
-        avg_temp_so_far = self.state.daily_temp_sum / self.state.daily_temp_count
-        daily_rate = compute_daily_growth_mm(
-            avg_temp_so_far,
+        remaining = self.growth_threshold_mm - self.growth_since_mow
+        if remaining <= 0:
+            earliest = now
+        else:
+            daily_rate = self._forecast_daily_rate()
+            if daily_rate is None or daily_rate <= 0:
+                self.state.next_mow_time = None
+                return
+            earliest = now + timedelta(days=remaining / daily_rate)
+        self.state.next_mow_time = self._next_release_time(earliest)
+
+    def _forecast_daily_rate(self) -> float | None:
+        """Expected growth in mm/day: recent average, else today's temperatures."""
+        if self.state.growth_rate_estimate is not None:
+            return self.state.growth_rate_estimate
+        if self.state.daily_temp_count:
+            avg_temp = self.state.daily_temp_sum / self.state.daily_temp_count
+        else:
+            current_temp = _float_state(self.hass, self.temperature_entity_id)
+            if current_temp is None:
+                return None
+            avg_temp = current_temp
+        return compute_daily_growth_mm(
+            avg_temp,
             self.growth_optimal_temp,
             self.growth_temp_variance,
             self.growth_max_rate_mm,
             self._current_water_factor(),
             self._current_light_factor(),
         )
-        if daily_rate <= 0:
-            self.state.next_mow_time = None
-            return
-        days_needed = remaining / daily_rate
-        self.state.next_mow_time = dt_util.utcnow() + timedelta(days=days_needed)
+
+    def _next_release_time(self, earliest: datetime) -> datetime | None:
+        """First moment >= earliest that is past cooldown/grace and inside the mow window.
+
+        Weather blockers can't be predicted, so they are ignored here.
+        """
+        candidate = earliest
+        if self.state.last_mow_time is not None:
+            cooldown_end = self.state.last_mow_time + timedelta(hours=self.min_mow_interval_hours)
+            candidate = max(candidate, cooldown_end)
+        if BLOCKER_GRACE_PERIOD in self.state.active_blockers and self.state.release_since:
+            grace_end = self.state.release_since + timedelta(minutes=self.release_grace_minutes)
+            candidate = max(candidate, grace_end)
+
+        local = dt_util.as_local(candidate)
+        tz = local.tzinfo
+        for offset in range(8):
+            day = local.date() + timedelta(days=offset)
+            if str(day.weekday()) not in self.allowed_weekdays:
+                continue
+            window_start = datetime.combine(day, self.mow_window_start, tzinfo=tz)
+            window_end = datetime.combine(day, self.mow_window_end, tzinfo=tz)
+            if local <= window_start:
+                return dt_util.as_utc(window_start)
+            if local <= window_end:
+                return dt_util.as_utc(local)
+        return None
 
     async def _async_maybe_act(self, raw_blockers: list[str], now: datetime) -> None:
         mower_state = self._mower_state()
@@ -770,10 +1001,15 @@ class SmartMowingCoordinator:
             return
         if mower_state != STATE_DOCKED:
             return
+        if self.state.pending_start_since is not None:
+            return
+        if self.state.start_retry_after is not None and now < self.state.start_retry_after:
+            return
 
         await self.async_start_mowing()
 
     async def async_start_mowing(self) -> None:
+        """Send start_mowing. The mow is only counted once the mower reports "mowing"."""
         if not self.mower_entity_id:
             return
         try:
@@ -785,9 +1021,16 @@ class SmartMowingCoordinator:
                 "%s: could not start mowing on %s: %s", self.device_name, self.mower_entity_id, err
             )
             return
-        self.state.mower_started_by_us = True
-        self.state.last_mow_time = dt_util.utcnow()
-        self.hass.bus.async_fire(EVENT_MOWING_STARTED, {"config_entry_id": self.entry.entry_id})
+        if self._mower_state() == STATE_MOWING:
+            # already mowing (e.g. force_mow during a run) - nothing to confirm
+            return
+        self.state.pending_start_since = dt_util.utcnow()
+        self._cancel_start_timeout()
+        self._unsub_start_timeout = async_call_later(
+            self.hass,
+            timedelta(minutes=MOW_START_TIMEOUT_MINUTES),
+            self._async_on_start_timeout,
+        )
 
     async def _async_dock(self, reason: str) -> None:
         if not self.mower_entity_id:
