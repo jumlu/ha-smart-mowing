@@ -7,8 +7,9 @@ regardless of vendor.
 - Mows only once the lawn has actually grown enough (PACE Turf Growth Potential model).
 - Never mows onto wet grass (rain, recent rain, dew).
 - Aborts a running mow if rain starts, and docks the mower.
-- Respects a mow-window, weekdays, heat lockout, drought lockout, irrigation lockout and a
-  minimum interval between mows.
+- Respects a mow-window, weekdays, heat lockout, frost lockout, drought lockout, irrigation
+  lockout and a minimum interval between mows.
+- Tells you when the lawn has gone into winter dormancy (time to winterize the mower).
 - Survives Home Assistant restarts — the growth accumulator is not lost.
 
 ## Installation via HACS
@@ -114,6 +115,19 @@ Because the temperature response is a bell curve, growth collapses on its own du
 no separate correction needed. The heat lockout below still exists, but purely to protect the
 mower hardware from operating in extreme heat, independent of the growth model.
 
+The cold side is different: growth gets very slow but never quite reaches zero (≈0.1 mm/day at
+5 °C), so a mild winter week could still add up to a mow. Two things cover that:
+
+- **Frost lockout** (default below 4 °C air temperature, with the temperature hysteresis): blocks
+  mowing on frozen or frosted grass — cutting frozen blades damages them, and ground frost forms
+  well before the air reaches 0 °C.
+- **Winter dormancy** (`binary_sensor.<name>_winter_dormancy`): turns on once the modeled daily
+  growth stays below 0.1 mm/day for 5 days in a row, and off again after 5 days in a row at or
+  above it — so a single mild day in January or a cold snap in April doesn't flip it. It fires
+  `smart_mowing_dormancy_changed` and is meant for a "winterize the mower" notification. By
+  default it only informs; enable "Pause automatic mowing during winter dormancy" in the options
+  to also block automatic mowing (blocker `dormant`) until spring.
+
 ## Entities
 
 | Entity | Type | Description |
@@ -122,6 +136,7 @@ mower hardware from operating in extreme heat, independent of the growth model.
 | `sensor.<name>_mow_need` | Sensor (%) | `(growth_index − baseline) / threshold × 100`, capped at 200% |
 | `binary_sensor.<name>_mowing_allowed` | Binary sensor | AND of all lockouts; `blockers` attribute lists active reasons |
 | `binary_sensor.<name>_grass_wet` | Binary sensor (`moisture`) | Standalone wetness assessment (rain/dew/recent rain) |
+| `binary_sensor.<name>_winter_dormancy` | Binary sensor (persists across restarts) | Lawn has stopped growing for the season; attributes `streak_days`, `growth_rate_mm_per_day` |
 | `switch.<name>_automatic` | Switch (restores across restarts) | Master switch — off disables all automatic action |
 | `sensor.<name>_last_mow` | Sensor (`timestamp`) | When the mower last actually started mowing (any trigger) |
 | `sensor.<name>_next_mow` | Sensor (`timestamp`) | Forecast of the next mow (see FAQ) |
@@ -139,7 +154,8 @@ All entities of a config entry are grouped under one device.
 ## Events
 
 - `smart_mowing_started` (fired once the mower confirms `mowing` on a run Smart Mowing started),
-  `smart_mowing_aborted` (with `reason`), `smart_mowing_completed`.
+  `smart_mowing_aborted` (with `reason`), `smart_mowing_completed`,
+  `smart_mowing_dormancy_changed` (with `dormant: true/false`).
 
 ## Reconfiguration and removal
 
@@ -197,7 +213,7 @@ evaluation, so the timestamp shifts a little over time — a live re-estimate, n
 
 **Why didn't it mow even though `mow_need` is over 100%?** Check
 `binary_sensor.<name>_mowing_allowed`'s `blockers` attribute — it lists every active lockout
-(rain, dew, heat, drought, cooldown, irrigation, outside the mow window, a grace period after the
+(rain, dew, heat, frost, winter dormancy, drought, cooldown, irrigation, outside the mow window, a grace period after the
 last blocker cleared, ...).
 
 **Why does it ignore my Hydrawise switch flipping on/off every 30 minutes?** Hydrawise switch

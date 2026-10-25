@@ -77,7 +77,11 @@
           "hysteresis_dewpoint": "Dew point hysteresis (K)",
           "hysteresis_soil_moisture": "Soil moisture hysteresis (%)",
           "release_grace_minutes": "Release grace period (min)",
-          "only_dock_own_runs": "Only dock runs started by Smart Mowing"
+          "only_dock_own_runs": "Only dock runs started by Smart Mowing",
+          "frost_lockout_temp": "Frost lockout below (°C)",
+          "dormancy_growth_threshold_mm": "Winter dormancy: daily growth below (mm/d)",
+          "dormancy_days": "Winter dormancy: for (consecutive days)",
+          "dormancy_pauses_automatic": "Pause automatic mowing during winter dormancy"
         }
       }
     }
@@ -102,6 +106,8 @@
               "irrigation_recent": "Irrigation ended recently",
               "dew": "Dew on the grass",
               "heat": "Too hot",
+              "frost": "Frost risk",
+              "dormant": "Winter dormancy",
               "drought": "Drought lockout",
               "cooldown": "Mowed recently",
               "unavailable_source": "A required sensor is unavailable",
@@ -110,7 +116,8 @@
           }
         }
       },
-      "grass_wet": { "name": "Grass wet" }
+      "grass_wet": { "name": "Grass wet" },
+      "dormant": { "name": "Winter dormancy" }
     },
     "switch": {
       "automatic": { "name": "Automatic" }

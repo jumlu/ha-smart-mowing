@@ -42,6 +42,8 @@ async def async_get_config_entry_diagnostics(
             "growth_baseline": coordinator.state.growth_baseline,
             "growth_since_mow": coordinator.growth_since_mow,
             "growth_rate_estimate": coordinator.state.growth_rate_estimate,
+            "dormant": coordinator.state.dormant,
+            "dormancy_streak_days": coordinator.state.dormancy_streak_days,
             "need_percent": coordinator.state.need_percent,
             "mow_needed": coordinator.state.mow_needed,
             "mow_allowed": coordinator.state.mow_allowed,
