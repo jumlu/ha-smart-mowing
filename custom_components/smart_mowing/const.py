@@ -47,6 +47,10 @@ CONF_HYSTERESIS_DEWPOINT = "hysteresis_dewpoint"
 CONF_HYSTERESIS_SOIL_MOISTURE = "hysteresis_soil_moisture"
 CONF_RELEASE_GRACE_MINUTES = "release_grace_minutes"
 CONF_ONLY_DOCK_OWN_RUNS = "only_dock_own_runs"
+CONF_FROST_LOCKOUT_TEMP = "frost_lockout_temp"
+CONF_DORMANCY_GROWTH_THRESHOLD_MM = "dormancy_growth_threshold_mm"
+CONF_DORMANCY_DAYS = "dormancy_days"
+CONF_DORMANCY_PAUSES_AUTOMATIC = "dormancy_pauses_automatic"
 
 # --- Defaults ---
 # Growth Potential (PACE Turf) defaults for cool-season (C3) turf: Lolium, Poa,
@@ -76,6 +80,14 @@ DEFAULT_HYSTERESIS_SOIL_MOISTURE = 3.0
 DEFAULT_RELEASE_GRACE_MINUTES = 30
 DEFAULT_IRRIGATION_LOCKOUT_HOURS = 3
 DEFAULT_ONLY_DOCK_OWN_RUNS = True
+# Frozen or frosted blades break when cut; 4 °C air temperature leaves margin
+# for ground frost, which forms well before the air reaches 0 °C.
+DEFAULT_FROST_LOCKOUT_TEMP = 4.0
+# Winter dormancy: daily growth below this for dormancy_days in a row enters
+# dormancy; the same number of days at or above it ends it.
+DEFAULT_DORMANCY_GROWTH_THRESHOLD_MM = 0.1
+DEFAULT_DORMANCY_DAYS = 5
+DEFAULT_DORMANCY_PAUSES_AUTOMATIC = False
 
 # --- Growth model damping when no rain sensor is configured ---
 NO_SOIL_SENSOR_DROUGHT_FACTOR = 0.3
@@ -122,6 +134,8 @@ BLOCKER_IRRIGATION_ACTIVE = "irrigation_active"
 BLOCKER_IRRIGATION_RECENT = "irrigation_recent"
 BLOCKER_DEW = "dew"
 BLOCKER_HEAT = "heat"
+BLOCKER_FROST = "frost"
+BLOCKER_DORMANT = "dormant"
 BLOCKER_DROUGHT = "drought"
 BLOCKER_COOLDOWN = "cooldown"
 BLOCKER_UNAVAILABLE_SOURCE = "unavailable_source"
@@ -135,6 +149,8 @@ ALL_BLOCKERS = [
     BLOCKER_IRRIGATION_RECENT,
     BLOCKER_DEW,
     BLOCKER_HEAT,
+    BLOCKER_FROST,
+    BLOCKER_DORMANT,
     BLOCKER_DROUGHT,
     BLOCKER_COOLDOWN,
     BLOCKER_UNAVAILABLE_SOURCE,
@@ -145,6 +161,7 @@ ALL_BLOCKERS = [
 EVENT_MOWING_STARTED = "smart_mowing_started"
 EVENT_MOWING_ABORTED = "smart_mowing_aborted"
 EVENT_MOWING_COMPLETED = "smart_mowing_completed"
+EVENT_DORMANCY_CHANGED = "smart_mowing_dormancy_changed"
 
 # --- Services ---
 SERVICE_FORCE_MOW = "force_mow"

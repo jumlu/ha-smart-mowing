@@ -18,8 +18,12 @@ from .const import (
     CONF_ALLOWED_WEEKDAYS,
     CONF_DEWPOINT_ENTITY,
     CONF_DEWPOINT_SPREAD_MIN,
+    CONF_DORMANCY_DAYS,
+    CONF_DORMANCY_GROWTH_THRESHOLD_MM,
+    CONF_DORMANCY_PAUSES_AUTOMATIC,
     CONF_DROUGHT_NO_RAIN_DAYS,
     CONF_DROUGHT_SOIL_MOISTURE_THRESHOLD,
+    CONF_FROST_LOCKOUT_TEMP,
     CONF_GROWTH_MAX_RATE_MM,
     CONF_GROWTH_OPTIMAL_TEMP,
     CONF_GROWTH_TEMP_VARIANCE,
@@ -49,8 +53,12 @@ from .const import (
     CONF_TEMPERATURE_ENTITY,
     DEFAULT_ALLOWED_WEEKDAYS,
     DEFAULT_DEWPOINT_SPREAD_MIN,
+    DEFAULT_DORMANCY_DAYS,
+    DEFAULT_DORMANCY_GROWTH_THRESHOLD_MM,
+    DEFAULT_DORMANCY_PAUSES_AUTOMATIC,
     DEFAULT_DROUGHT_NO_RAIN_DAYS,
     DEFAULT_DROUGHT_SOIL_MOISTURE_THRESHOLD,
+    DEFAULT_FROST_LOCKOUT_TEMP,
     DEFAULT_GROWTH_MAX_RATE_MM,
     DEFAULT_GROWTH_OPTIMAL_TEMP,
     DEFAULT_GROWTH_TEMP_VARIANCE,
@@ -298,6 +306,14 @@ class SmartMowingOptionsFlow(OptionsFlow):
                     selector.NumberSelectorConfig(min=0, max=50, step=0.5, unit_of_measurement="°C")
                 ),
                 vol.Optional(
+                    CONF_FROST_LOCKOUT_TEMP,
+                    default=options.get(CONF_FROST_LOCKOUT_TEMP, DEFAULT_FROST_LOCKOUT_TEMP),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=-10, max=15, step=0.5, unit_of_measurement="°C"
+                    )
+                ),
+                vol.Optional(
                     CONF_DROUGHT_SOIL_MOISTURE_THRESHOLD,
                     default=options.get(
                         CONF_DROUGHT_SOIL_MOISTURE_THRESHOLD,
@@ -367,6 +383,28 @@ class SmartMowingOptionsFlow(OptionsFlow):
                 vol.Optional(
                     CONF_ONLY_DOCK_OWN_RUNS,
                     default=options.get(CONF_ONLY_DOCK_OWN_RUNS, DEFAULT_ONLY_DOCK_OWN_RUNS),
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_DORMANCY_GROWTH_THRESHOLD_MM,
+                    default=options.get(
+                        CONF_DORMANCY_GROWTH_THRESHOLD_MM, DEFAULT_DORMANCY_GROWTH_THRESHOLD_MM
+                    ),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0, max=2, step=0.05, unit_of_measurement="mm/d"
+                    )
+                ),
+                vol.Optional(
+                    CONF_DORMANCY_DAYS,
+                    default=options.get(CONF_DORMANCY_DAYS, DEFAULT_DORMANCY_DAYS),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=1, max=30, step=1, unit_of_measurement="d")
+                ),
+                vol.Optional(
+                    CONF_DORMANCY_PAUSES_AUTOMATIC,
+                    default=options.get(
+                        CONF_DORMANCY_PAUSES_AUTOMATIC, DEFAULT_DORMANCY_PAUSES_AUTOMATIC
+                    ),
                 ): selector.BooleanSelector(),
             }
         )

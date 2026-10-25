@@ -22,6 +22,7 @@ async def async_setup_entry(
         [
             MowingAllowedBinarySensor(coordinator, entry),
             GrassWetBinarySensor(coordinator, entry),
+            DormantBinarySensor(coordinator, entry),
         ]
     )
 
@@ -75,3 +76,26 @@ class GrassWetBinarySensor(_BaseBinarySensor):
     @property
     def is_on(self) -> bool:
         return self.coordinator.state.wet
+
+
+class DormantBinarySensor(_BaseBinarySensor):
+    """Winter dormancy: the lawn has stopped growing, time to winterize the mower."""
+
+    _attr_translation_key = "dormant"
+    _attr_icon = "mdi:snowflake"
+
+    def __init__(self, coordinator: SmartMowingCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_dormant"
+
+    @property
+    def is_on(self) -> bool:
+        return self.coordinator.state.dormant
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        rate = self.coordinator.state.growth_rate_estimate
+        return {
+            "streak_days": self.coordinator.state.dormancy_streak_days,
+            "growth_rate_mm_per_day": round(rate, 3) if rate is not None else None,
+        }

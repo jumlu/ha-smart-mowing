@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0 — 2026-10-25
+
+### Added
+
+- **Frost lockout** (`frost` blocker): no mowing below `frost_lockout_temp` (default 4 °C), with
+  the existing temperature hysteresis.
+- **Winter dormancy** (`binary_sensor.<name>_winter_dormancy`): on after `dormancy_days`
+  (default 5) consecutive days with modeled growth below `dormancy_growth_threshold_mm`
+  (default 0.1 mm/day), off after the same number of days at or above it. Persisted across
+  restarts, fires `smart_mowing_dormancy_changed`. Optional `dormancy_pauses_automatic`
+  (default off) blocks automatic mowing while dormant (`dormant` blocker, forecast `unknown`).
+
 ## 0.4.0 — 2026-10-25
 
 ### Fixed

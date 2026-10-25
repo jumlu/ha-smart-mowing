@@ -39,7 +39,9 @@ from .const import (
     ALL_BLOCKERS,
     BLOCKER_COOLDOWN,
     BLOCKER_DEW,
+    BLOCKER_DORMANT,
     BLOCKER_DROUGHT,
+    BLOCKER_FROST,
     BLOCKER_GRACE_PERIOD,
     BLOCKER_HEAT,
     BLOCKER_IRRIGATION_ACTIVE,
@@ -51,8 +53,12 @@ from .const import (
     CONF_ALLOWED_WEEKDAYS,
     CONF_DEWPOINT_ENTITY,
     CONF_DEWPOINT_SPREAD_MIN,
+    CONF_DORMANCY_DAYS,
+    CONF_DORMANCY_GROWTH_THRESHOLD_MM,
+    CONF_DORMANCY_PAUSES_AUTOMATIC,
     CONF_DROUGHT_NO_RAIN_DAYS,
     CONF_DROUGHT_SOIL_MOISTURE_THRESHOLD,
+    CONF_FROST_LOCKOUT_TEMP,
     CONF_GROWTH_MAX_RATE_MM,
     CONF_GROWTH_OPTIMAL_TEMP,
     CONF_GROWTH_TEMP_VARIANCE,
@@ -82,8 +88,12 @@ from .const import (
     CONF_TEMPERATURE_ENTITY,
     DEFAULT_ALLOWED_WEEKDAYS,
     DEFAULT_DEWPOINT_SPREAD_MIN,
+    DEFAULT_DORMANCY_DAYS,
+    DEFAULT_DORMANCY_GROWTH_THRESHOLD_MM,
+    DEFAULT_DORMANCY_PAUSES_AUTOMATIC,
     DEFAULT_DROUGHT_NO_RAIN_DAYS,
     DEFAULT_DROUGHT_SOIL_MOISTURE_THRESHOLD,
+    DEFAULT_FROST_LOCKOUT_TEMP,
     DEFAULT_GROWTH_MAX_RATE_MM,
     DEFAULT_GROWTH_OPTIMAL_TEMP,
     DEFAULT_GROWTH_TEMP_VARIANCE,
@@ -104,6 +114,7 @@ from .const import (
     DEFAULT_SOLAR_RADIATION_REFERENCE,
     DOMAIN,
     EVALUATION_INTERVAL_MINUTES,
+    EVENT_DORMANCY_CHANGED,
     EVENT_MOWING_ABORTED,
     EVENT_MOWING_COMPLETED,
     EVENT_MOWING_STARTED,
@@ -254,6 +265,9 @@ class SmartMowingRuntimeState:
     growth_baseline: float | None = None
     # exponential moving average of the daily growth in mm, for the forecast
     growth_rate_estimate: float | None = None
+    # winter dormancy and the number of consecutive days pointing the other way
+    dormant: bool = False
+    dormancy_streak_days: int = 0
     daily_temp_sum: float = 0.0
     daily_temp_count: int = 0
     last_rollover_date: date | None = None
@@ -396,6 +410,24 @@ class SmartMowingCoordinator:
         return float(self._cfg(CONF_HEAT_LOCKOUT_TEMP, DEFAULT_HEAT_LOCKOUT_TEMP))
 
     @property
+    def frost_lockout_temp(self) -> float:
+        return float(self._cfg(CONF_FROST_LOCKOUT_TEMP, DEFAULT_FROST_LOCKOUT_TEMP))
+
+    @property
+    def dormancy_growth_threshold_mm(self) -> float:
+        return float(
+            self._cfg(CONF_DORMANCY_GROWTH_THRESHOLD_MM, DEFAULT_DORMANCY_GROWTH_THRESHOLD_MM)
+        )
+
+    @property
+    def dormancy_days(self) -> int:
+        return int(self._cfg(CONF_DORMANCY_DAYS, DEFAULT_DORMANCY_DAYS))
+
+    @property
+    def dormancy_pauses_automatic(self) -> bool:
+        return bool(self._cfg(CONF_DORMANCY_PAUSES_AUTOMATIC, DEFAULT_DORMANCY_PAUSES_AUTOMATIC))
+
+    @property
     def drought_soil_moisture_threshold(self) -> float:
         return float(
             self._cfg(
@@ -473,6 +505,8 @@ class SmartMowingCoordinator:
         self.state.growth_rate_estimate = float(rate) if rate is not None else None
         last_mow = data.get("last_mow_time")
         self.state.last_mow_time = dt_util.parse_datetime(last_mow) if last_mow else None
+        self.state.dormant = bool(data.get("dormant", False))
+        self.state.dormancy_streak_days = int(data.get("dormancy_streak_days", 0))
         self.state.need_percent = self.need_percent
 
     def _data_to_save(self) -> dict[str, Any]:
@@ -483,6 +517,8 @@ class SmartMowingCoordinator:
             "last_mow_time": self.state.last_mow_time.isoformat()
             if self.state.last_mow_time
             else None,
+            "dormant": self.state.dormant,
+            "dormancy_streak_days": self.state.dormancy_streak_days,
         }
 
     def _schedule_save(self) -> None:
@@ -729,6 +765,7 @@ class SmartMowingCoordinator:
             if previous_rate is None
             else GROWTH_RATE_EMA_ALPHA * daily_growth + (1 - GROWTH_RATE_EMA_ALPHA) * previous_rate
         )
+        self._update_dormancy(daily_growth)
         self._schedule_save()
         self.state.daily_temp_sum = 0.0
         self.state.daily_temp_count = 0
@@ -741,6 +778,29 @@ class SmartMowingCoordinator:
             water_factor,
             light_factor,
             self.state.growth_index,
+        )
+
+    def _update_dormancy(self, daily_growth: float) -> None:
+        """Enter/leave winter dormancy after dormancy_days consecutive days of evidence."""
+        growing = daily_growth >= self.dormancy_growth_threshold_mm
+        # while dormant we count growing days, otherwise non-growing days
+        if growing == self.state.dormant:
+            self.state.dormancy_streak_days += 1
+        else:
+            self.state.dormancy_streak_days = 0
+        if self.state.dormancy_streak_days < self.dormancy_days:
+            return
+        self.state.dormant = not self.state.dormant
+        self.state.dormancy_streak_days = 0
+        _LOGGER.info(
+            "%s: lawn %s winter dormancy (daily growth %.2f mm)",
+            self.device_name,
+            "entered" if self.state.dormant else "left",
+            daily_growth,
+        )
+        self.hass.bus.async_fire(
+            EVENT_DORMANCY_CHANGED,
+            {"config_entry_id": self.entry.entry_id, "dormant": self.state.dormant},
         )
 
     # ------------------------------------------------------------- restore
@@ -862,6 +922,14 @@ class SmartMowingCoordinator:
                 temp, self.heat_lockout_temp, self.hysteresis_temp, was_blocked
             ):
                 blockers.append(BLOCKER_HEAT)
+            was_blocked = hyst_state.get(BLOCKER_FROST, False)
+            if below_with_hysteresis(
+                temp, self.frost_lockout_temp, self.hysteresis_temp, was_blocked
+            ):
+                blockers.append(BLOCKER_FROST)
+
+        if self.state.dormant and self.dormancy_pauses_automatic:
+            blockers.append(BLOCKER_DORMANT)
 
         soil_moisture = _float_state(self.hass, self.soil_moisture_entity_id)
         if soil_moisture is not None:
@@ -922,6 +990,10 @@ class SmartMowingCoordinator:
     def _compute_next_mow_estimate(self, now: datetime) -> None:
         if self.state.mow_needed and self.state.mow_allowed:
             self.state.next_mow_time = now
+            return
+        if self.state.dormant and self.dormancy_pauses_automatic:
+            # paused until spring - no meaningful date to give
+            self.state.next_mow_time = None
             return
         remaining = self.growth_threshold_mm - self.growth_since_mow
         if remaining <= 0:
