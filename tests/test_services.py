@@ -54,6 +54,7 @@ async def test_reset_growth_service(hass):
         DOMAIN, SERVICE_RESET_GROWTH, {"entity_id": entity_id}, blocking=True
     )
     assert entry.runtime_data.state.growth_index == 0.0
+    assert entry.runtime_data.need_percent == 0.0
 
 
 async def test_set_growth_service(hass):
@@ -67,6 +68,8 @@ async def test_set_growth_service(hass):
         blocking=True,
     )
     assert entry.runtime_data.state.growth_index == 30.0
+    # set_growth calibrates the growth since the last mow
+    assert entry.runtime_data.growth_since_mow == 30.0
 
 
 async def test_force_mow_service_starts_mower(hass):
@@ -84,4 +87,11 @@ async def test_force_mow_service_starts_mower(hass):
         DOMAIN, SERVICE_FORCE_MOW, {"entity_id": entity_id}, blocking=True
     )
     assert len(calls) == 1
+    # only a confirmed "mowing" state counts, not the command itself
+    assert entry.runtime_data.state.pending_start_since is not None
+    assert entry.runtime_data.state.last_mow_time is None
+
+    hass.states.async_set(MOWER_ENTITY, "mowing")
+    await hass.async_block_till_done()
     assert entry.runtime_data.state.mower_started_by_us is True
+    assert entry.runtime_data.state.last_mow_time is not None

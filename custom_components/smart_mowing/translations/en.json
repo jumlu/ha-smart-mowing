@@ -126,14 +126,14 @@
     },
     "reset_growth": {
       "name": "Reset growth index",
-      "description": "Set the growth index back to 0, e.g. after manual mowing.",
+      "description": "Set the growth index and mow need back to 0. Manual mows are detected automatically.",
       "fields": {
         "entity_id": { "name": "Entity", "description": "Any Smart Mowing entity of the target lawn area." }
       }
     },
     "set_growth": {
       "name": "Set growth index",
-      "description": "Calibrate the growth index to a specific value.",
+      "description": "Calibrate the growth since the last mow to a specific value.",
       "fields": {
         "entity_id": { "name": "Entity", "description": "Any Smart Mowing entity of the target lawn area." },
         "value": { "name": "Value", "description": "New growth index value (mm)." }
