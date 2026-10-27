@@ -204,12 +204,13 @@ setup dialog, prefilled with your current values — change the temperature sens
 add/change the rain rate sensor and any other weather sensor in step 2. The entry, its entities,
 and their history stay intact; nothing needs to be deleted and recreated.
 
-**How is `sensor.<name>_next_mow` (the forecast) computed?** Below 100% need: "now + remaining mm /
-expected growth per day", where the expected rate is a moving average of the recent daily growth
-(falling back to today's temperatures right after setup). At or above 100%: "now" if mowing is
-allowed, otherwise the next moment the minimum interval / grace period has passed and the mow
-window is open. Weather lockouts can't be predicted and are ignored. It's recomputed on every
-evaluation, so the timestamp shifts a little over time — a live re-estimate, not an appointment.
+**How is `sensor.<name>_next_mow` (the forecast) computed?** Below 100% need: "start of today +
+remaining mm / expected growth per day", rounded up to the full hour, where the expected rate is a
+moving average of the recent daily growth (falling back to today's temperatures right after setup).
+At or above 100%: the moment the mow became due if mowing is allowed, otherwise the next moment the
+minimum interval / grace period has passed and the mow window is open. Weather lockouts can't be
+predicted and are ignored. Since growth only changes at midnight, the forecast normally stays put
+all day and only moves after the daily rollover.
 
 **Why didn't it mow even though `mow_need` is over 100%?** Check
 `binary_sensor.<name>_mowing_allowed`'s `blockers` attribute — it lists every active lockout

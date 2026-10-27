@@ -240,6 +240,11 @@ def compute_need_percent(growth_since_mow: float, threshold_mm: float) -> float:
     return clamp(growth_since_mow / threshold_mm * 100.0, 0.0, NEED_PERCENT_CAP)
 
 
+def _ceil_to_hour(value: datetime) -> datetime:
+    floored = value.replace(minute=0, second=0, microsecond=0)
+    return floored if floored == value else floored + timedelta(hours=1)
+
+
 def _is_valid_state(state: State | None) -> TypeGuard[State]:
     return state is not None and state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE)
 
@@ -508,6 +513,9 @@ class SmartMowingCoordinator:
         self.state.dormant = bool(data.get("dormant", False))
         self.state.dormancy_streak_days = int(data.get("dormancy_streak_days", 0))
         self.state.need_percent = self.need_percent
+        self.state.mow_needed = self.state.need_percent >= 100.0
+        # so the forecast sensor's first state is a date, not "unknown"
+        self._compute_next_mow_estimate(dt_util.utcnow())
 
     def _data_to_save(self) -> dict[str, Any]:
         return {
@@ -988,8 +996,16 @@ class SmartMowingCoordinator:
         self.notify_listeners()
 
     def _compute_next_mow_estimate(self, now: datetime) -> None:
+        """Forecast the next mow, stable between evaluations.
+
+        Growth only changes at the daily rollover, so the estimate is anchored
+        to the start of the day and rounded up to the hour instead of being
+        "now + x", which would move on every evaluation and flood the recorder.
+        """
         if self.state.mow_needed and self.state.mow_allowed:
-            self.state.next_mow_time = now
+            previous = self.state.next_mow_time
+            if previous is None or previous > now:
+                self.state.next_mow_time = now.replace(second=0, microsecond=0)
             return
         if self.state.dormant and self.dormancy_pauses_automatic:
             # paused until spring - no meaningful date to give
@@ -1003,7 +1019,9 @@ class SmartMowingCoordinator:
             if daily_rate is None or daily_rate <= 0:
                 self.state.next_mow_time = None
                 return
-            earliest = now + timedelta(days=remaining / daily_rate)
+            day_start = dt_util.as_utc(dt_util.start_of_local_day(dt_util.as_local(now)))
+            earliest = max(now, day_start + timedelta(days=remaining / daily_rate))
+            earliest = _ceil_to_hour(earliest)
         self.state.next_mow_time = self._next_release_time(earliest)
 
     def _forecast_daily_rate(self) -> float | None:
