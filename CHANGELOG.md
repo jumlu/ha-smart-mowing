@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.1 — 2026-10-28
+
+### Fixed
+
+- **`next_mow` forecast no longer drifts every few minutes.** It was "now + days remaining" and
+  changed on every evaluation (~650 recorder rows a day). It is now anchored to the start of the
+  day and rounded up to the full hour; while a mow is due it keeps the moment it became due.
+- **No `unknown` forecast after a restart.** The forecast is computed while loading the stored
+  state, before the sensor writes its first value.
+
 ## 0.5.0 — 2026-10-25
 
 ### Added

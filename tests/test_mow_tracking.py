@@ -35,6 +35,7 @@ TEMP_ENTITY = "sensor.test_temperature"
 MOW_NEED_ENTITY = "sensor.front_lawn_mow_need"
 GROWTH_ENTITY = "sensor.front_lawn_growth_index"
 LAST_MOW_ENTITY = "sensor.front_lawn_last_mow"
+NEXT_MOW_ENTITY = "sensor.front_lawn_next_mow_forecast"
 ENTRY_ID = "test_entry_id"
 
 # 12:00 local (US/Pacific, the test harness time zone) on a Tuesday
@@ -430,9 +431,45 @@ async def test_forecast_below_threshold_uses_growth_rate(hass, freezer):
 
     await coordinator._async_evaluate()
 
-    # 4 mm threshold at 0.25 mm/day -> 16 days
-    expected = dt_util.utcnow() + timedelta(days=16)
-    assert coordinator.state.next_mow_time == expected
+    # 4 mm threshold at 0.25 mm/day -> 16 days, counted from the start of today
+    day_start = dt_util.as_utc(dt_util.start_of_local_day())
+    assert coordinator.state.next_mow_time == day_start + timedelta(days=16)
+
+
+async def test_forecast_is_stable_between_evaluations(hass, freezer):
+    freezer.move_to(NOON)
+    entry = await _setup(hass)
+    coordinator = entry.runtime_data
+    coordinator.state.automatic_enabled = False
+    coordinator.state.growth_index = 11.0
+    coordinator.state.growth_baseline = 10.0
+    coordinator.state.growth_rate_estimate = 0.3
+    await coordinator._async_evaluate()
+    first = coordinator.state.next_mow_time
+
+    for _ in range(6):
+        freezer.tick(timedelta(minutes=37))
+        await coordinator._async_evaluate()
+        assert coordinator.state.next_mow_time == first
+
+    assert first.minute == 0 and first.second == 0
+
+
+async def test_forecast_available_right_after_restart(hass, hass_storage, freezer):
+    freezer.move_to(NOON)
+    hass_storage[f"{DOMAIN}.{ENTRY_ID}"] = _stored(57.0, 56.0, rate=0.25)
+    seen: list[str] = []
+
+    def _record(event):
+        if event.data["entity_id"] == NEXT_MOW_ENTITY and event.data["new_state"]:
+            seen.append(event.data["new_state"].state)
+
+    hass.bus.async_listen("state_changed", _record)
+
+    await _setup(hass)
+
+    assert seen
+    assert "unknown" not in seen
 
 
 async def test_forecast_falls_back_to_temperature_model(hass, freezer):
@@ -458,7 +495,13 @@ async def test_forecast_at_or_above_threshold_and_allowed_is_now(hass, freezer):
     await coordinator._async_evaluate()
 
     assert coordinator.state.mow_allowed is True
-    assert coordinator.state.next_mow_time == dt_util.utcnow()
+    due = coordinator.state.next_mow_time
+    assert due == dt_util.utcnow().replace(second=0, microsecond=0)
+
+    # stays at the moment it became due instead of following "now"
+    freezer.tick(timedelta(minutes=10))
+    await coordinator._async_evaluate()
+    assert coordinator.state.next_mow_time == due
 
 
 async def test_forecast_at_or_above_threshold_outside_window_is_next_window(hass, freezer):
