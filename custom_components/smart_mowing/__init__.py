@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import voluptuous as vol
+from homeassistant.components.frontend import add_extra_js_url
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
+from homeassistant.loader import async_get_integration
 
 from .const import (
     ATTR_GROWTH_VALUE,
     DOMAIN,
+    FRONTEND_CARD_FILE,
+    FRONTEND_URL_PATH,
     PLATFORMS,
     SERVICE_FORCE_MOW,
     SERVICE_RESET_GROWTH,
@@ -53,6 +60,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SmartMowingConfigEntry) 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     _async_register_services(hass)
+    await _async_register_card(hass)
 
     return True
 
@@ -67,6 +75,21 @@ async def async_unload_entry(hass: HomeAssistant, entry: SmartMowingConfigEntry)
 
 async def _async_update_listener(hass: HomeAssistant, entry: SmartMowingConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def _async_register_card(hass: HomeAssistant) -> None:
+    """Serve the bundled calendar card and load it in the frontend (once per HA run)."""
+    flag = f"{DOMAIN}_card_registered"
+    if hass.data.get(flag) or getattr(hass, "http", None) is None:
+        return
+    hass.data[flag] = True
+    integration = await async_get_integration(hass, DOMAIN)
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig(FRONTEND_URL_PATH, str(Path(__file__).parent / "frontend"), False)]
+    )
+    if "frontend" in hass.config.components:
+        # version query so browsers pick up a new card after an update
+        add_extra_js_url(hass, f"{FRONTEND_URL_PATH}/{FRONTEND_CARD_FILE}?v={integration.version}")
 
 
 def _async_register_services(hass: HomeAssistant) -> None:

@@ -50,7 +50,9 @@ from .const import (
     BLOCKER_RAINING,
     BLOCKER_RECENT_RAIN,
     BLOCKER_UNAVAILABLE_SOURCE,
+    CALENDAR_LANGUAGES,
     CONF_ALLOWED_WEEKDAYS,
+    CONF_CALENDAR_LANGUAGE,
     CONF_DEWPOINT_ENTITY,
     CONF_DEWPOINT_SPREAD_MIN,
     CONF_DORMANCY_DAYS,
@@ -413,6 +415,15 @@ class SmartMowingCoordinator:
     @property
     def heat_lockout_temp(self) -> float:
         return float(self._cfg(CONF_HEAT_LOCKOUT_TEMP, DEFAULT_HEAT_LOCKOUT_TEMP))
+
+    @property
+    def calendar_language(self) -> str:
+        """Language of calendar event titles; defaults to the HA system language."""
+        configured = self._cfg(CONF_CALENDAR_LANGUAGE)
+        if configured in CALENDAR_LANGUAGES:
+            return str(configured)
+        system = (self.hass.config.language or "en").split("-")[0]
+        return system if system in CALENDAR_LANGUAGES else "en"
 
     @property
     def frost_lockout_temp(self) -> float:

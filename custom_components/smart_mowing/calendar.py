@@ -51,7 +51,7 @@ class MowPlanCalendar(CalendarEntity):
         if planned is None:
             return None
         local = dt_util.as_local(planned)
-        language = (self.hass.config.language or "en").split("-")[0]
+        language = self.coordinator.calendar_language
         need = round(self.coordinator.need_percent)
         return CalendarEvent(
             start=local.date(),

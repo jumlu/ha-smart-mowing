@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from pathlib import Path
 
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.smart_mowing.const import (
+    CONF_CALENDAR_LANGUAGE,
     CONF_MOW_WINDOW_END,
     CONF_MOW_WINDOW_START,
     CONF_MOWER_ENTITY,
@@ -15,6 +17,7 @@ from custom_components.smart_mowing.const import (
     CONF_RELEASE_GRACE_MINUTES,
     CONF_TEMPERATURE_ENTITY,
     DOMAIN,
+    FRONTEND_CARD_FILE,
 )
 
 MOWER_ENTITY = "lawn_mower.test_mower"
@@ -25,7 +28,7 @@ CALENDAR_ENTITY = "calendar.front_lawn_mow_plan"
 NOON = "2026-10-20 19:00:00+00:00"
 
 
-async def _setup(hass) -> MockConfigEntry:
+async def _setup(hass, options=None) -> MockConfigEntry:
     hass.states.async_set(MOWER_ENTITY, "docked")
     hass.states.async_set(TEMP_ENTITY, "15")
     entry = MockConfigEntry(
@@ -39,6 +42,7 @@ async def _setup(hass) -> MockConfigEntry:
             CONF_MOW_WINDOW_START: "00:00:00",
             CONF_MOW_WINDOW_END: "23:59:59",
             CONF_RELEASE_GRACE_MINUTES: 0,
+            **(options or {}),
         },
     )
     entry.add_to_hass(hass)
@@ -116,3 +120,37 @@ async def test_no_event_outside_requested_range_or_without_forecast(hass, freeze
     assert coordinator.state.next_mow_time is None
     assert await _get_events(hass, now, now + timedelta(days=60)) == []
     assert hass.states.get(CALENDAR_ENTITY).state == "off"
+
+
+async def test_event_title_follows_configured_language(hass, freezer):
+    freezer.move_to(NOON)
+    entry = await _setup(hass, options={CONF_CALENDAR_LANGUAGE: "de"})
+    coordinator = entry.runtime_data
+    coordinator.state.growth_index = 10.0
+    coordinator.state.growth_baseline = 10.0
+    coordinator.state.growth_rate_estimate = 0.25
+    await coordinator._async_evaluate()
+
+    now = dt_util.now()
+    events = await _get_events(hass, now, now + timedelta(days=30))
+    assert events[0]["summary"] == "Mähen geplant"
+
+
+async def test_event_title_defaults_to_system_language(hass):
+    hass.config.language = "de"
+    entry = await _setup(hass)
+    assert entry.runtime_data.calendar_language == "de"
+
+    hass.config.language = "fr"
+    assert entry.runtime_data.calendar_language == "en"
+
+
+def test_bundled_card_is_shipped():
+    card = (
+        Path(__file__).parent.parent
+        / "custom_components"
+        / "smart_mowing"
+        / "frontend"
+        / FRONTEND_CARD_FILE
+    )
+    assert "smart-mowing-calendar-card" in card.read_text(encoding="utf-8")

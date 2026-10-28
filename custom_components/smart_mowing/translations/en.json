@@ -81,10 +81,14 @@
           "frost_lockout_temp": "Frost lockout below (°C)",
           "dormancy_growth_threshold_mm": "Winter dormancy: daily growth below (mm/d)",
           "dormancy_days": "Winter dormancy: for (consecutive days)",
-          "dormancy_pauses_automatic": "Pause automatic mowing during winter dormancy"
+          "dormancy_pauses_automatic": "Pause automatic mowing during winter dormancy",
+          "calendar_language": "Language of calendar event titles"
         }
       }
     }
+  },
+  "selector": {
+    "calendar_language": { "options": { "de": "German", "en": "English" } }
   },
   "entity": {
     "sensor": {

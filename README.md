@@ -144,6 +144,22 @@ The cold side is different: growth gets very slow but never quite reaches zero (
 
 All entities of a config entry are grouped under one device.
 
+## Dashboard card
+
+The integration ships a compact month calendar card (loaded automatically, no HACS frontend
+install). Mowed days show as filled green circles, the planned next mow as a dashed orange circle:
+
+```yaml
+type: custom:smart-mowing-calendar-card
+history_entity: calendar.mow_log            # any calendar whose events mark mowed days
+plan_entity: calendar.<name>_mow_plan       # the forecast next mow
+title: Mow days                             # optional
+```
+
+`history_entity` can be a Local Calendar filled by an automation that adds an all-day event when
+the mower has been `mowing` for a few minutes. Labels follow the viewing user's language
+(German/English).
+
 ## Services
 
 - `smart_mowing.force_mow` — start mowing now, bypassing all lockouts.

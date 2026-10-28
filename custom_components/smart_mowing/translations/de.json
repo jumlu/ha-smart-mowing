@@ -81,10 +81,14 @@
           "frost_lockout_temp": "Frost-Sperre unter (°C)",
           "dormancy_growth_threshold_mm": "Winterpause: Tageszuwachs unter (mm/d)",
           "dormancy_days": "Winterpause: für (Tage in Folge)",
-          "dormancy_pauses_automatic": "Automatik in der Winterpause pausieren"
+          "dormancy_pauses_automatic": "Automatik in der Winterpause pausieren",
+          "calendar_language": "Sprache der Kalendertermine"
         }
       }
     }
+  },
+  "selector": {
+    "calendar_language": { "options": { "de": "Deutsch", "en": "Englisch" } }
   },
   "entity": {
     "sensor": {
