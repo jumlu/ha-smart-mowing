@@ -6,7 +6,7 @@ from datetime import time
 
 DOMAIN = "smart_mowing"
 
-PLATFORMS = ["sensor", "binary_sensor", "switch"]
+PLATFORMS = ["sensor", "binary_sensor", "switch", "calendar"]
 
 # --- Config entry keys (step 1, required) ---
 CONF_NAME = "name"

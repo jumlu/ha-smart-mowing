@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 — 2026-10-28
+
+### Added
+
+- **Mow plan calendar** (`calendar.<name>_mow_plan`): the forecast next mow as one all-day
+  event ("Mähen geplant" / "Mow planned") that moves with `sensor.<name>_next_mow`. Description
+  carries the forecast time and the current mow need. Combine it with a calendar of past mows in
+  any calendar card.
+
 ## 0.5.1 — 2026-10-28
 
 ### Fixed

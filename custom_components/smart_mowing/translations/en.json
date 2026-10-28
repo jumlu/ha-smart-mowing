@@ -119,6 +119,9 @@
       "grass_wet": { "name": "Grass wet" },
       "dormant": { "name": "Winter dormancy" }
     },
+    "calendar": {
+      "mow_plan": { "name": "Mow plan" }
+    },
     "switch": {
       "automatic": { "name": "Automatic" }
     }

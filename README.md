@@ -140,6 +140,7 @@ The cold side is different: growth gets very slow but never quite reaches zero (
 | `switch.<name>_automatic` | Switch (restores across restarts) | Master switch — off disables all automatic action |
 | `sensor.<name>_last_mow` | Sensor (`timestamp`) | When the mower last actually started mowing (any trigger) |
 | `sensor.<name>_next_mow` | Sensor (`timestamp`) | Forecast of the next mow (see FAQ) |
+| `calendar.<name>_mow_plan` | Calendar | The forecast next mow as an all-day event that moves with the forecast |
 
 All entities of a config entry are grouped under one device.
 

@@ -23,6 +23,7 @@ EXPECTED_UNIQUE_ID_SUFFIXES = [
     "_mowing_allowed",
     "_grass_wet",
     "_dormant",
+    "_mow_plan",
     "_automatic",
 ]
 
