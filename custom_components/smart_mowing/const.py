@@ -51,6 +51,7 @@ CONF_FROST_LOCKOUT_TEMP = "frost_lockout_temp"
 CONF_DORMANCY_GROWTH_THRESHOLD_MM = "dormancy_growth_threshold_mm"
 CONF_DORMANCY_DAYS = "dormancy_days"
 CONF_DORMANCY_PAUSES_AUTOMATIC = "dormancy_pauses_automatic"
+CONF_CALENDAR_LANGUAGE = "calendar_language"
 
 # --- Defaults ---
 # Growth Potential (PACE Turf) defaults for cool-season (C3) turf: Lolium, Poa,
@@ -89,6 +90,9 @@ DEFAULT_DORMANCY_GROWTH_THRESHOLD_MM = 0.1
 DEFAULT_DORMANCY_DAYS = 5
 DEFAULT_DORMANCY_PAUSES_AUTOMATIC = False
 
+# --- Calendar event titles (calendar events can't use HA's translations) ---
+CALENDAR_LANGUAGES = ["de", "en"]
+
 # --- Growth model damping when no rain sensor is configured ---
 NO_SOIL_SENSOR_DROUGHT_FACTOR = 0.3
 
@@ -121,6 +125,10 @@ MOW_FLAP_DEBOUNCE_SECONDS = 300
 
 # --- Forecast: smoothing factor for the exponential moving average of daily growth ---
 GROWTH_RATE_EMA_ALPHA = 0.3
+
+# --- Bundled dashboard card ---
+FRONTEND_URL_PATH = "/smart_mowing_static"
+FRONTEND_CARD_FILE = "smart-mowing-calendar-card.js"
 
 # --- Persistent storage ---
 STORAGE_VERSION = 1

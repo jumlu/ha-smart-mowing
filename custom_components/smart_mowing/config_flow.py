@@ -11,11 +11,13 @@ from homeassistant.config_entries import (
     ConfigFlow,
     OptionsFlow,
 )
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import selector
 
 from .const import (
+    CALENDAR_LANGUAGES,
     CONF_ALLOWED_WEEKDAYS,
+    CONF_CALENDAR_LANGUAGE,
     CONF_DEWPOINT_ENTITY,
     CONF_DEWPOINT_SPREAD_MIN,
     CONF_DORMANCY_DAYS,
@@ -89,6 +91,11 @@ WEEKDAY_OPTIONS = [
     selector.SelectOptionDict(value="5", label="Saturday"),
     selector.SelectOptionDict(value="6", label="Sunday"),
 ]
+
+
+def _default_calendar_language(hass: HomeAssistant) -> str:
+    system = (hass.config.language or "en").split("-")[0]
+    return system if system in CALENDAR_LANGUAGES else "en"
 
 
 def _suggest(defaults: dict[str, Any], key: str) -> dict[str, Any]:
@@ -406,6 +413,17 @@ class SmartMowingOptionsFlow(OptionsFlow):
                         CONF_DORMANCY_PAUSES_AUTOMATIC, DEFAULT_DORMANCY_PAUSES_AUTOMATIC
                     ),
                 ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_CALENDAR_LANGUAGE,
+                    default=options.get(
+                        CONF_CALENDAR_LANGUAGE, _default_calendar_language(self.hass)
+                    ),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=CALENDAR_LANGUAGES,
+                        translation_key=CONF_CALENDAR_LANGUAGE,
+                    )
+                ),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

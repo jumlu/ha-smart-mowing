@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.0 — 2026-10-28
+
+### Added
+
+- **Bundled dashboard card** `custom:smart-mowing-calendar-card`: a compact month view with mowed
+  days as green circles and the planned next mow as a dashed orange circle, month navigation and
+  a short summary. German/English follow the viewing user's language. The integration serves and
+  loads the card itself, no separate HACS frontend install needed.
+- **Option `calendar_language`** (de/en) for the event titles of the mow plan calendar. Defaults
+  to the HA system language.
+
 ## 0.6.0 — 2026-10-28
 
 ### Added
